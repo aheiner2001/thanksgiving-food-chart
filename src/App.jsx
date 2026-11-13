@@ -565,10 +565,11 @@ export default function App() {
               </button>
             </div>
 
+            {/* Auto-responsive grid: squeezes on wide screens or cleanly wraps to next row if screen is narrow, never causing horizontal overflow */}
             <div 
               className="grid gap-4 items-stretch"
               style={{
-                gridTemplateColumns: `repeat(${categories.length}, minmax(240px, 1fr))`
+                gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, max(230px, 100% / ${Math.min(categories.length, 6)} - 1rem)), 1fr))`
               }}
             >
               {categories.map((cat) => {
