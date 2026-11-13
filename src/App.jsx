@@ -435,17 +435,17 @@ export default function App() {
       {/* Header */}
       <header className="max-w-[1650px] mx-auto mb-6 bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-amber-900/10 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-4">
-          {/* Interactive Hover Turkey Face */}
-          <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex-shrink-0 cursor-pointer group">
+          {/* Interactive Hover Turkey Face (Preloaded and pointer-events safe to eliminate any flicker/blink) */}
+          <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 flex-shrink-0 cursor-pointer group rounded-2xl border-2 border-amber-900/15 bg-white shadow-md overflow-hidden">
             <img
               src="./turkey.png"
               alt="Thanksgiving Turkey"
-              className="absolute inset-0 w-full h-full object-contain rounded-2xl border-2 border-amber-900/15 bg-white shadow-md transition-opacity duration-150 group-hover:opacity-0"
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none group-hover:hidden"
             />
             <img
               src="./turkey-hover.png"
               alt="Thanksgiving Turkey Hover Face"
-              className="absolute inset-0 w-full h-full object-contain rounded-2xl border-2 border-amber-900/15 bg-white shadow-md transition-opacity duration-150 opacity-0 group-hover:opacity-100"
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none hidden group-hover:block"
             />
           </div>
           <div>
