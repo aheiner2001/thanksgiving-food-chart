@@ -503,14 +503,14 @@ export default function App() {
         )}
       </section>
 
-      {/* Main Board Columns: 3x3 layout on desktop and tablets */}
-      <main className="max-w-[1600px] mx-auto">
+      {/* Main Board Columns: 1 row with 5fr (or auto fitting for added categories) */}
+      <main className="max-w-[1650px] mx-auto pb-32">
         {loading ? (
           <div className="py-24 text-center text-sm font-semibold text-gray-400 bg-white/90 rounded-2xl">
             Loading sign-up board...
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4 items-stretch">
             {categories.map((cat) => {
               const catItems = items.filter((it) => it.categoryId === cat.id);
               const isEmpty = catItems.length === 0;
@@ -1062,6 +1062,16 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Seamless Thanksgiving Harvest Border at the bottom */}
+      <div 
+        className="fixed bottom-0 left-0 right-0 h-20 sm:h-24 pointer-events-none select-none z-10 opacity-90"
+        style={{
+          backgroundImage: 'url("./harvest-border.jpg")',
+          backgroundRepeat: 'repeat-x',
+          backgroundPosition: 'bottom center',
+          backgroundSize: 'auto 100%'
+        }}
+      />
     </div>
   );
 }

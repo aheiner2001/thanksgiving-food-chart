@@ -4,12 +4,8 @@
 
 body {
   margin: 0;
-  /* Seamless Festive Thanksgiving Pattern: scaled larger (640px) to blend cleanly */
-  background-color: #fff9f5;
-  background-image: url('./assets/festive-pattern.jpg');
-  background-repeat: repeat;
-  background-size: 640px 640px;
-  background-attachment: fixed;
+  /* Clean warm white background with festive bottom harvest border */
+  background-color: #fdfbf7;
   color: #261f18;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
