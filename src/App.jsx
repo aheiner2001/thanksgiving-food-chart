@@ -427,14 +427,14 @@ export default function App() {
     <div className="min-h-screen text-[#261f18] font-sans antialiased p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <header className="max-w-[1650px] mx-auto mb-6 bg-white/95 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-amber-900/10 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <img
             src="./turkey.png"
             alt="Thanksgiving Turkey"
-            className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-xl border border-amber-900/15 bg-white shadow-xs"
+            className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain rounded-2xl border-2 border-amber-900/15 bg-white shadow-md flex-shrink-0"
           />
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight">
               Thanksgiving Sign-Up
             </h1>
             <p className="text-xs sm:text-sm text-amber-900/70 font-medium">
