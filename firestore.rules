@@ -1,38 +1,91 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Categories collection
+
+    // --- THANKSGIVING APP (No login required for family guests) ---
     match /categories/{categoryId} {
-      // Anyone can read categories
       allow read: if true;
-      
-      // Anyone can create a category with validated fields
       allow create: if request.resource.data.name is string 
                     && request.resource.data.name.size() > 0 
-                    && request.resource.data.name.size() <= 50;
-                    
-      // Updates/deletes: allowed for admin or category management
+                    && request.resource.data.name.size() <= 60;
       allow update, delete: if true;
     }
-    
-    // Items collection
+
     match /items/{itemId} {
-      // Anyone can read items (live guest view)
       allow read: if true;
-      
-      // Anyone can create an item with valid fields
       allow create: if request.resource.data.name is string 
                     && request.resource.data.name.size() > 0 
-                    && request.resource.data.name.size() <= 80
+                    && request.resource.data.name.size() <= 100
                     && request.resource.data.broughtBy is string
                     && request.resource.data.broughtBy.size() > 0
-                    && request.resource.data.broughtBy.size() <= 50
                     && request.resource.data.categoryId is string
                     && request.resource.data.ownerId is string;
-                    
-      // Edits and deletes allowed (client verifies ownerId or admin param)
       allow update, delete: if true;
+    }
+
+    // --- MULTI-STOPWATCH APP ---
+    match /workspaces/{workspaceId} {
+      allow read, write: if true;
+    }
+
+    // --- YOUR EXISTING APP RULES ---
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function memberPath(groupId) {
+      return /databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid);
+    }
+    function isMember(groupId) {
+      return signedIn() && exists(memberPath(groupId));
+    }
+    function isOwner(groupId) {
+      return isMember(groupId) && get(memberPath(groupId)).data.role == 'owner';
+    }
+
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+      allow create, update: if isSelf(uid);
+      match /groupIds/{groupId} {
+        allow read, write: if isSelf(uid);
+      }
+    }
+
+    match /groups/{groupId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasAll(['name', 'joinCode', 'ownerId', 'categories', 'createdAt']);
+      allow read: if signedIn();
+      allow update: if isOwner(groupId);
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow read: if isMember(groupId) || isSelf(uid);
+        allow create: if signedIn() && isSelf(uid)
+          && (request.resource.data.role == 'member'
+            || (request.resource.data.role == 'owner'
+              && request.auth.uid == get(/databases/$(database)/documents/groups/$(groupId)).data.ownerId));
+        allow update, delete: if false;
+      }
+
+      match /items/{itemId} {
+        allow read: if isMember(groupId);
+        allow create: if isMember(groupId)
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update, delete: if isMember(groupId)
+          && (resource.data.createdBy == request.auth.uid || isOwner(groupId));
+      }
+
+      match /events/{eventId} {
+        allow read: if isMember(groupId);
+        allow create: if isMember(groupId)
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update: if isMember(groupId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['going']);
+        allow delete: if isOwner(groupId) || resource.data.createdBy == request.auth.uid;
+      }
     }
   }
 }
