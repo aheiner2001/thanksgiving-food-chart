@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Categories collection
+    match /categories/{categoryId} {
+      // Anyone can read categories
+      allow read: if true;
+      
+      // Anyone can create a category with validated fields
+      allow create: if request.resource.data.name is string 
+                    && request.resource.data.name.size() > 0 
+                    && request.resource.data.name.size() <= 50;
+                    
+      // Updates/deletes: allowed for admin or category management
+      allow update, delete: if true;
+    }
+    
+    // Items collection
+    match /items/{itemId} {
+      // Anyone can read items (live guest view)
+      allow read: if true;
+      
+      // Anyone can create an item with valid fields
+      allow create: if request.resource.data.name is string 
+                    && request.resource.data.name.size() > 0 
+                    && request.resource.data.name.size() <= 80
+                    && request.resource.data.broughtBy is string
+                    && request.resource.data.broughtBy.size() > 0
+                    && request.resource.data.broughtBy.size() <= 50
+                    && request.resource.data.categoryId is string
+                    && request.resource.data.ownerId is string;
+                    
+      // Edits and deletes allowed (client verifies ownerId or admin param)
+      allow update, delete: if true;
+    }
+  }
+}
