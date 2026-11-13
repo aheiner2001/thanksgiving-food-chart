@@ -503,14 +503,14 @@ export default function App() {
         )}
       </section>
 
-      {/* Main Board Columns */}
+      {/* Main Board Columns: 3x3 layout on desktop and tablets */}
       <main className="max-w-[1600px] mx-auto">
         {loading ? (
           <div className="py-24 text-center text-sm font-semibold text-gray-400 bg-white/90 rounded-2xl">
             Loading sign-up board...
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
             {categories.map((cat) => {
               const catItems = items.filter((it) => it.categoryId === cat.id);
               const isEmpty = catItems.length === 0;
