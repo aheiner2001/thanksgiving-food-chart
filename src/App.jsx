@@ -12,7 +12,7 @@ import {
 import { db } from './firebase';
 import { getOwnerId, getSavedName, saveGuestName, findSimilarItems } from './utils';
 
-// Default starter categories per Aaron's spec
+// Default starter categories
 const DEFAULT_CATEGORIES = [
   { name: 'Main Dish', icon: '🍗' },
   { name: 'Side Dish', icon: '🥔' },
@@ -24,32 +24,46 @@ const DEFAULT_CATEGORIES = [
 export default function App() {
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Ownership & Admin
   const [myOwnerId] = useState(() => getOwnerId());
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Add/Edit modal state
+  // Add / Edit Item Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [targetCategory, setTargetCategory] = useState(null); // Category object we are adding to
-  const [editingItem, setEditingItem] = useState(null); // Item if editing
+  const [targetCategory, setTargetCategory] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
 
   // Form inputs
   const [itemName, setItemName] = useState('');
   const [broughtBy, setBroughtBy] = useState(getSavedName());
   const [servings, setServings] = useState('');
   const [needsMore, setNeedsMore] = useState(false);
+  const [targetCount, setTargetCount] = useState(2); // How many wanted if needs more
 
-  // New Category Modal / Inline state
+  // Suggestion Modal / Input
+  const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
+  const [suggestName, setSuggestName] = useState('');
+  const [suggestCategory, setSuggestCategory] = useState('');
+
+  // Claim Suggestion Modal
+  const [claimingSuggestion, setClaimingSuggestion] = useState(null);
+
+  // Claim "I can bring one too!" Modal
+  const [claimingMoreItem, setClaimingMoreItem] = useState(null);
+  const [volunteerName, setVolunteerName] = useState(getSavedName());
+
+  // New Category Modal
   const [isNewCatModalOpen, setIsNewCatModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Duplicate detection
+  // Duplicate warning
   const [duplicateMatches, setDuplicateMatches] = useState([]);
   const [bypassWarning, setBypassWarning] = useState(false);
 
-  // Check admin url param
+  // Check admin
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('admin') === 'true' || params.get('admin') === 'aaron' || params.get('key') === 'thanksgiving-admin') {
@@ -61,7 +75,6 @@ export default function App() {
   useEffect(() => {
     const unsubCats = onSnapshot(query(collection(db, 'categories')), async (snapshot) => {
       if (snapshot.empty) {
-        // Seed initial default categories
         for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
           await addDoc(collection(db, 'categories'), {
             name: DEFAULT_CATEGORIES[i].name,
@@ -86,13 +99,19 @@ export default function App() {
       setLoading(false);
     });
 
+    const unsubSuggestions = onSnapshot(query(collection(db, 'suggestions')), (snapshot) => {
+      const sugList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setSuggestions(sugList);
+    });
+
     return () => {
       unsubCats();
       unsubItems();
+      unsubSuggestions();
     };
   }, []);
 
-  // Check duplicates when typing item name
+  // Check duplicate matches
   useEffect(() => {
     if (itemName.trim().length >= 3) {
       const matches = findSimilarItems(itemName, items, editingItem ? editingItem.id : null);
@@ -111,6 +130,7 @@ export default function App() {
     setBroughtBy(getSavedName());
     setServings('');
     setNeedsMore(false);
+    setTargetCount(2);
     setDuplicateMatches([]);
     setBypassWarning(false);
     setIsModalOpen(true);
@@ -124,6 +144,7 @@ export default function App() {
     setBroughtBy(item.broughtBy || '');
     setServings(item.servings || '');
     setNeedsMore(!!item.needsMore);
+    setTargetCount(item.targetCount || 2);
     setDuplicateMatches([]);
     setBypassWarning(false);
     setIsModalOpen(true);
@@ -150,6 +171,7 @@ export default function App() {
           broughtBy: broughtBy.trim(),
           servings: servings.trim(),
           needsMore: needsMore,
+          targetCount: needsMore ? Number(targetCount) || 2 : null,
           updatedAt: serverTimestamp()
         });
       } else {
@@ -159,6 +181,8 @@ export default function App() {
           categoryId: targetCategory.id,
           servings: servings.trim(),
           needsMore: needsMore,
+          targetCount: needsMore ? Number(targetCount) || 2 : null,
+          currentCount: 1, // Starting count is 1
           ownerId: myOwnerId,
           createdAt: serverTimestamp()
         });
@@ -177,7 +201,7 @@ export default function App() {
     }
   };
 
-  // Create new column / category
+  // Create new category
   const handleCreateCategory = async (e) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
@@ -207,34 +231,205 @@ export default function App() {
     }
   };
 
+  // Handle volunteer to bring another one of an item that "needs more"
+  const handleConfirmBringMore = async (e) => {
+    e.preventDefault();
+    if (!volunteerName.trim() || !claimingMoreItem) return;
+
+    saveGuestName(volunteerName);
+
+    try {
+      const originalItem = claimingMoreItem;
+      const prevCount = originalItem.currentCount || 1;
+      const target = originalItem.targetCount || 2;
+      const newCount = prevCount + 1;
+
+      // 1. Update original item's count & update needsMore if fulfilled
+      await updateDoc(doc(db, 'items', originalItem.id), {
+        currentCount: newCount,
+        needsMore: newCount < target
+      });
+
+      // 2. Automatically duplicate item card for this volunteer
+      await addDoc(collection(db, 'items'), {
+        name: originalItem.name,
+        broughtBy: volunteerName.trim(),
+        categoryId: originalItem.categoryId,
+        servings: originalItem.servings || '',
+        parentItemId: originalItem.id, // linked to original
+        currentCount: newCount,
+        targetCount: target,
+        needsMore: newCount < target,
+        ownerId: myOwnerId,
+        createdAt: serverTimestamp()
+      });
+
+      setClaimingMoreItem(null);
+    } catch (err) {
+      alert('Error updating: ' + err.message);
+    }
+  };
+
+  // Add a floating suggestion
+  const handleAddSuggestion = async (e) => {
+    e.preventDefault();
+    if (!suggestName.trim() || !suggestCategory) return;
+
+    try {
+      await addDoc(collection(db, 'suggestions'), {
+        name: suggestName.trim(),
+        categoryId: suggestCategory,
+        createdAt: serverTimestamp()
+      });
+      setSuggestName('');
+      setIsSuggestModalOpen(false);
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  // Claim a floating suggestion and convert it into a real item card
+  const handleConfirmClaimSuggestion = async (e) => {
+    e.preventDefault();
+    if (!volunteerName.trim() || !claimingSuggestion) return;
+
+    saveGuestName(volunteerName);
+
+    try {
+      // 1. Create item
+      await addDoc(collection(db, 'items'), {
+        name: claimingSuggestion.name,
+        broughtBy: volunteerName.trim(),
+        categoryId: claimingSuggestion.categoryId,
+        currentCount: 1,
+        ownerId: myOwnerId,
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Delete suggestion bubble
+      await deleteDoc(doc(db, 'suggestions', claimingSuggestion.id));
+
+      setClaimingSuggestion(null);
+    } catch (err) {
+      alert('Error claiming idea: ' + err.message);
+    }
+  };
+
+  // Delete suggestion bubble
+  const handleDeleteSuggestion = async (sug, e) => {
+    e.stopPropagation();
+    await deleteDoc(doc(db, 'suggestions', sug.id));
+  };
+
   return (
     <div className="min-h-screen bg-white text-[#222] font-sans antialiased p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <header className="max-w-[1600px] mx-auto mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-200 pb-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-            <span>🦃</span>
-            <span>Thanksgiving Sign-Up</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
-            Click "+ Add" at the bottom of any column to sign up
-          </p>
+      {/* Header with Aaron's Pilgrim Turkey */}
+      <header className="max-w-[1600px] mx-auto mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-200 pb-5">
+        <div className="flex items-center gap-3">
+          <img
+            src="./turkey.png"
+            alt="Thanksgiving Turkey"
+            className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-xl border border-gray-200 bg-gray-50 shadow-xs"
+          />
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+              Thanksgiving Sign-Up
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 font-medium">
+              Click "+ Add" at the bottom of any column to sign up
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 flex-wrap">
           {isAdmin && (
-            <span className="bg-amber-100 text-amber-900 border border-amber-300 text-xs px-2.5 py-1 rounded-md font-bold">
+            <span className="bg-amber-100 text-amber-900 border border-amber-300 text-xs px-2.5 py-1.5 rounded-md font-bold">
               Aaron Admin Active
             </span>
           )}
           <button
+            onClick={() => {
+              setSuggestCategory(categories[0]?.id || '');
+              setIsSuggestModalOpen(true);
+            }}
+            className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-lg transition flex items-center gap-1.5"
+          >
+            <span>💡</span>
+            <span>+ Suggest an Idea</span>
+          </button>
+          <button
             onClick={() => setIsNewCatModalOpen(true)}
-            className="px-3.5 py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg transition"
+            className="px-3.5 py-2 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-lg transition"
           >
             + Add New Category
           </button>
         </div>
       </header>
+
+      {/* Floating Idea / Wishlist Suggestions Canvas at the very top */}
+      <section className="max-w-[1600px] mx-auto mb-8 bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 sm:p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+              <span>💭</span>
+              <span>Idea Wishlist & Suggestions</span>
+            </span>
+            <span className="text-xs text-gray-500">
+              (Click any floating idea to claim it!)
+            </span>
+          </div>
+
+          <button
+            onClick={() => {
+              setSuggestCategory(categories[0]?.id || '');
+              setIsSuggestModalOpen(true);
+            }}
+            className="text-xs font-bold text-amber-900 hover:underline"
+          >
+            + Add Suggestion
+          </button>
+        </div>
+
+        {suggestions.length === 0 ? (
+          <div className="py-4 text-center text-xs font-medium text-gray-400 border border-dashed border-amber-200 rounded-xl bg-white/70">
+            No suggestions yet. Have a favorite dish or activity idea? Click <strong>"+ Suggest an Idea"</strong>!
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2.5 items-center">
+            {suggestions.map((sug) => {
+              const catObj = categories.find(c => c.id === sug.categoryId);
+              return (
+                <div
+                  key={sug.id}
+                  onClick={() => {
+                    setVolunteerName(getSavedName());
+                    setClaimingSuggestion(sug);
+                  }}
+                  className="group cursor-pointer bg-white border border-amber-300 hover:border-amber-500 hover:shadow-md px-3 py-1.5 rounded-full flex items-center gap-2 transition select-none text-xs"
+                  title="Click to claim and bring this!"
+                >
+                  <span className="font-bold text-gray-900">
+                    {sug.name}
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium">
+                    {catObj?.name || 'General'}
+                  </span>
+                  <span className="text-xs text-amber-600 font-bold group-hover:text-amber-800">
+                    Claim →
+                  </span>
+                  <button
+                    onClick={(e) => handleDeleteSuggestion(sug, e)}
+                    className="text-gray-300 hover:text-red-500 ml-0.5 text-xs"
+                    title="Remove suggestion"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Main Board Columns */}
       <main className="max-w-[1600px] mx-auto">
@@ -251,11 +446,12 @@ export default function App() {
               return (
                 <div
                   key={cat.id}
-                  className="bg-gray-50/80 border border-gray-200 rounded-xl flex flex-col min-h-[460px] shadow-sm hover:border-gray-300 transition"
+                  className="bg-gray-50/80 border border-gray-200 rounded-xl flex flex-col min-h-[480px] shadow-sm hover:border-gray-300 transition"
                 >
                   {/* Column Header */}
                   <div className="p-3.5 border-b border-gray-200 bg-white rounded-t-xl flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                      <span className="text-base">{cat.icon || '🍽️'}</span>
                       <h2 className="font-bold text-gray-900 text-sm">
                         {cat.name}
                       </h2>
@@ -281,8 +477,8 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Column Items Scroll Area */}
-                  <div className="flex-1 p-2.5 space-y-2 overflow-y-auto max-h-[580px]">
+                  {/* Column Items */}
+                  <div className="flex-1 p-2.5 space-y-2.5 overflow-y-auto max-h-[580px]">
                     {isEmpty ? (
                       <div className="h-full min-h-[140px] flex flex-col items-center justify-center text-center p-3 text-gray-400 border border-dashed border-gray-200 rounded-lg">
                         <span className="text-xs font-medium">Nothing yet!</span>
@@ -294,6 +490,8 @@ export default function App() {
                       catItems.map((item) => {
                         const isOwner = item.ownerId === myOwnerId;
                         const canManage = isAdmin || isOwner;
+                        const count = item.currentCount || 1;
+                        const target = item.targetCount || (item.needsMore ? 2 : 1);
 
                         return (
                           <div
@@ -335,11 +533,31 @@ export default function App() {
                               )}
                             </div>
 
-                            {/* Needs More of this tag */}
-                            {item.needsMore && (
-                              <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded">
-                                🔥 Need more of this!
+                            {/* Need More of this Section & Interactive Duplication */}
+                            {item.needsMore ? (
+                              <div className="mt-2.5 pt-2 border-t border-gray-100">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-amber-800 flex items-center gap-1">
+                                    <span>🔥</span>
+                                    <span>We have {count} of {target} needed</span>
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setVolunteerName(getSavedName());
+                                    setClaimingMoreItem(item);
+                                  }}
+                                  className="mt-1.5 w-full py-1 px-2 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded text-[11px] transition text-center"
+                                >
+                                  + I can bring one too!
+                                </button>
                               </div>
+                            ) : (
+                              count > 1 && (
+                                <div className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold bg-green-50 text-green-800 border border-green-200 px-2 py-0.5 rounded">
+                                  ✓ We have {count} of these covered!
+                                </div>
+                              )
                             )}
                           </div>
                         );
@@ -347,7 +565,7 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Add Button pinned at the bottom of the column */}
+                  {/* Add Button pinned at the bottom */}
                   <div className="p-2.5 border-t border-gray-200 bg-white rounded-b-xl">
                     <button
                       onClick={() => handleOpenAdd(cat)}
@@ -361,10 +579,10 @@ export default function App() {
               );
             })}
 
-            {/* + Add Column Card (Always visible on the right) */}
+            {/* + Add Column Card */}
             <div
               onClick={() => setIsNewCatModalOpen(true)}
-              className="border-2 border-dashed border-gray-200 hover:border-gray-400 bg-gray-50/50 hover:bg-gray-50 rounded-xl flex flex-col items-center justify-center min-h-[460px] p-6 text-center cursor-pointer transition select-none"
+              className="border-2 border-dashed border-gray-200 hover:border-gray-400 bg-gray-50/50 hover:bg-gray-50 rounded-xl flex flex-col items-center justify-center min-h-[480px] p-6 text-center cursor-pointer transition select-none"
             >
               <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-700 font-bold text-base mb-2 shadow-xs">
                 +
@@ -380,7 +598,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Item Modal (Add or Edit) */}
+      {/* Modal: Add or Edit Item */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-sm p-5 shadow-xl">
@@ -468,7 +686,8 @@ export default function App() {
                 />
               </div>
 
-              <div className="pt-1">
+              {/* Need More Checkbox + Target count */}
+              <div className="pt-1 space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -480,6 +699,20 @@ export default function App() {
                     Flag as <strong>“Need more of this”</strong>
                   </span>
                 </label>
+
+                {needsMore && (
+                  <div className="pl-6 flex items-center gap-2">
+                    <span className="text-xs text-gray-600 font-medium">How many total wanted?</span>
+                    <input
+                      type="number"
+                      min="2"
+                      max="20"
+                      value={targetCount}
+                      onChange={(e) => setTargetCount(e.target.value)}
+                      className="w-16 px-2 py-1 bg-gray-50 border border-gray-300 rounded text-xs font-bold"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 flex gap-2">
@@ -503,7 +736,160 @@ export default function App() {
         </div>
       )}
 
-      {/* Add New Category Modal */}
+      {/* Modal: Volunteer "I can bring one too!" */}
+      {claimingMoreItem && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-xs p-5 shadow-xl">
+            <h3 className="font-bold text-sm text-gray-900 mb-1">
+              Bring another {claimingMoreItem.name}?
+            </h3>
+            <p className="text-xs text-gray-500 mb-3">
+              This will add your own card for {claimingMoreItem.name} and update the count to { (claimingMoreItem.currentCount || 1) + 1 } out of { claimingMoreItem.targetCount || 2 }.
+            </p>
+            <form onSubmit={handleConfirmBringMore} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  Your Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. Uncle Bob"
+                  value={volunteerName}
+                  onChange={(e) => setVolunteerName(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClaimingMoreItem(null)}
+                  className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs"
+                >
+                  Confirm Sign-Up
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Suggest Idea / Floating Card */}
+      {isSuggestModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-sm p-5 shadow-xl">
+            <h3 className="font-bold text-sm text-gray-900 mb-1">
+              Suggest an Idea for the Wishlist
+            </h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Add a dish or activity you'd love to see at Thanksgiving. Anyone can click it to claim it!
+            </p>
+            <form onSubmit={handleAddSuggestion} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  Suggested Item or Idea *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. Cranberry Brie Bites, Touch Football"
+                  value={suggestName}
+                  onChange={(e) => setSuggestName(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  Category *
+                </label>
+                <select
+                  value={suggestCategory}
+                  onChange={(e) => setSuggestCategory(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-1 focus:ring-gray-900"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsSuggestModalOpen(false)}
+                  className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs"
+                >
+                  Add Suggestion
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Claim Floating Suggestion */}
+      {claimingSuggestion && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-xs p-5 shadow-xl">
+            <h3 className="font-bold text-sm text-gray-900 mb-1">
+              Claim "{claimingSuggestion.name}"
+            </h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Claim this idea and add it as your dish on the sign-up board.
+            </p>
+            <form onSubmit={handleConfirmClaimSuggestion} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                  Your Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. Uncle Bob"
+                  value={volunteerName}
+                  onChange={(e) => setVolunteerName(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClaimingSuggestion(null)}
+                  className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-gray-900 hover:bg-black text-white font-bold rounded-lg text-xs"
+                >
+                  Claim & Add
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add New Category */}
       {isNewCatModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-xs p-5 shadow-xl">
