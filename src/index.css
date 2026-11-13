@@ -4,8 +4,12 @@
 
 body {
   margin: 0;
-  /* Clean warm white background with festive bottom harvest border */
-  background-color: #fdfbf7;
+  /* Seamless Warm Thanksgiving Terracotta Pattern */
+  background-color: #b85028;
+  background-image: url('./assets/warm-pattern.jpg');
+  background-repeat: repeat;
+  background-size: 420px 420px;
+  background-attachment: fixed;
   color: #261f18;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
