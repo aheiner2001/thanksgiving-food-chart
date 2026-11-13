@@ -534,187 +534,228 @@ export default function App() {
         )}
       </section>
 
-      {/* Main Board Columns: 1 row with 5fr (or auto fitting for added categories) */}
+      {/* Main Board Columns: Responsive grid spanning available categories */}
       <main className="max-w-[1650px] mx-auto pb-32">
         {loading ? (
           <div className="py-24 text-center text-sm font-semibold text-gray-400 bg-white/90 rounded-2xl">
             Loading sign-up board...
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4 items-stretch">
-            {categories.map((cat) => {
-              const catItems = items.filter((it) => it.categoryId === cat.id);
-              const isEmpty = catItems.length === 0;
-              const isDragOver = dragOverColId === cat.id;
-              const isActivity = isActivityCat(cat);
+          <div className="flex flex-col gap-4">
+            {/* Top row bar for board controls */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-bold text-white/90 drop-shadow-sm uppercase tracking-wider">
+                Categories ({categories.length})
+              </span>
+              <button
+                onClick={() => setIsNewCatModalOpen(true)}
+                className="px-3 py-1.5 bg-white/90 hover:bg-white text-gray-900 border border-amber-900/10 text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5"
+                title="Add a new column"
+              >
+                <span>➕</span>
+                <span>Add Category</span>
+              </button>
+            </div>
 
-              return (
-                <div
-                  key={cat.id}
-                  onDragOver={(e) => handleDragOverColumn(e, cat.id)}
-                  onDragLeave={(e) => handleDragLeaveColumn(e, cat.id)}
-                  onDrop={(e) => handleDropOnColumn(e, cat)}
-                  className={`bg-white/95 backdrop-blur-md rounded-2xl flex flex-col min-h-[500px] shadow-sm transition-all border ${
-                    isDragOver
-                      ? 'border-2 border-amber-500 bg-amber-50/70 scale-[1.01] shadow-lg ring-2 ring-amber-300'
-                      : 'border-amber-900/15 hover:border-amber-900/30'
-                  }`}
-                >
-                  {/* Column Header */}
-                  <div className="p-3.5 border-b border-gray-100 bg-white/90 rounded-t-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">{cat.icon || '🍽️'}</span>
-                      <h2 className="font-bold text-gray-900 text-sm">
-                        {cat.name}
-                      </h2>
-                      <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                          isEmpty
-                            ? 'bg-red-50 text-red-600 border border-red-200'
-                            : 'bg-amber-100 text-amber-900'
-                        }`}
-                      >
-                        {catItems.length}
-                      </span>
-                    </div>
+            <div 
+              className="grid gap-4 items-stretch"
+              style={{
+                gridTemplateColumns: `repeat(${categories.length}, minmax(240px, 1fr))`
+              }}
+            >
+              {categories.map((cat) => {
+                const catItems = items.filter((it) => it.categoryId === cat.id);
+                const isEmpty = catItems.length === 0;
+                const isDragOver = dragOverColId === cat.id;
+                const isActivity = isActivityCat(cat);
+                const isDense = catItems.length > 5; // compact when many items
 
-                    {(isAdmin || isEmpty) && (
-                      <button
-                        onClick={() => handleDeleteCategory(cat)}
-                        title="Delete empty column"
-                        className="text-gray-400 hover:text-red-500 text-xs p-1 rounded"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Column Items */}
-                  <div className="flex-1 p-2.5 space-y-2.5 overflow-y-auto max-h-[580px]">
-                    {isEmpty ? (
-                      <div className="h-full min-h-[140px] flex flex-col items-center justify-center text-center p-3 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-                        <span className="text-xs font-medium">Nothing yet!</span>
-                        <span className="text-[11px] text-gray-400 mt-0.5">
-                          Drag here or click "+ Add"
+                return (
+                  <div
+                    key={cat.id}
+                    onDragOver={(e) => handleDragOverColumn(e, cat.id)}
+                    onDragLeave={(e) => handleDragLeaveColumn(e, cat.id)}
+                    onDrop={(e) => handleDropOnColumn(e, cat)}
+                    className={`bg-white/95 backdrop-blur-md rounded-2xl flex flex-col h-[520px] shadow-sm transition-all border ${
+                      isDragOver
+                        ? 'border-2 border-amber-500 bg-amber-50/70 scale-[1.01] shadow-lg ring-2 ring-amber-300'
+                        : 'border-amber-900/15 hover:border-amber-900/30'
+                    }`}
+                  >
+                    {/* Column Header */}
+                    <div className="p-3 border-b border-gray-100 bg-white/90 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base flex-shrink-0">{cat.icon || '🍽️'}</span>
+                        <h2 className="font-bold text-gray-900 text-sm truncate">
+                          {cat.name}
+                        </h2>
+                        <span
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            isEmpty
+                              ? 'bg-red-50 text-red-600 border border-red-200'
+                              : 'bg-amber-100 text-amber-900'
+                          }`}
+                        >
+                          {catItems.length}
                         </span>
                       </div>
-                    ) : (
-                      catItems.map((item) => {
-                        const isOwner = item.ownerId === myOwnerId;
-                        const canManage = isAdmin || isOwner;
-                        const count = item.currentCount || 1;
-                        const target = item.targetCount || (item.needsMore ? 2 : 1);
 
-                        return (
-                          <div
-                            key={item.id}
-                            draggable={canManage}
-                            onDragStart={(e) => handleDragStartItem(e, item)}
-                            className={`bg-white border rounded-xl p-3 shadow-xs hover:border-amber-300 hover:shadow-md transition group ${
-                              canManage ? 'cursor-grab active:cursor-grabbing' : ''
-                            } border-gray-200`}
-                          >
-                            <div className="flex items-start justify-between gap-1.5">
-                              <div className="flex items-center gap-1.5">
-                                {canManage && (
-                                  <span className="text-gray-300 group-hover:text-amber-500 text-xs select-none" title="Drag to move column">
-                                    ⠿
+                      {(isAdmin || isEmpty) && (
+                        <button
+                          onClick={() => handleDeleteCategory(cat)}
+                          title="Delete empty column"
+                          className="text-gray-400 hover:text-red-500 text-xs p-1 rounded flex-shrink-0 ml-1"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Uniform Scrollable Column Items Container */}
+                    <div 
+                      id={`col-scroll-${cat.id}`}
+                      className="flex-1 p-2.5 overflow-y-auto space-y-2 relative"
+                    >
+                      {isEmpty ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-3 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                          <span className="text-xs font-medium">Nothing yet!</span>
+                          <span className="text-[11px] text-gray-400 mt-0.5">
+                            Drag here or click "+ Add"
+                          </span>
+                        </div>
+                      ) : (
+                        catItems.map((item) => {
+                          const isOwner = item.ownerId === myOwnerId;
+                          const canManage = isAdmin || isOwner;
+                          const count = item.currentCount || 1;
+                          const target = item.targetCount || (item.needsMore ? 2 : 1);
+
+                          return (
+                            <div
+                              key={item.id}
+                              draggable={canManage}
+                              onDragStart={(e) => handleDragStartItem(e, item)}
+                              className={`bg-white border rounded-xl shadow-xs hover:border-amber-300 hover:shadow-md transition group ${
+                                isDense ? 'p-2 text-xs' : 'p-3'
+                              } ${
+                                canManage ? 'cursor-grab active:cursor-grabbing' : ''
+                              } border-gray-200`}
+                            >
+                              <div className="flex items-start justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  {canManage && (
+                                    <span className="text-gray-300 group-hover:text-amber-500 text-xs select-none flex-shrink-0" title="Drag to move column">
+                                      ⠿
+                                    </span>
+                                  )}
+                                  <span className="font-bold text-gray-900 text-sm leading-snug break-words">
+                                    {item.name}
                                   </span>
+                                </div>
+
+                                {canManage && (
+                                  <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 flex-shrink-0">
+                                    <button
+                                      onClick={() => handleOpenEdit(item, cat)}
+                                      className="text-xs text-gray-400 hover:text-gray-800 p-0.5"
+                                      title="Edit"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem(item)}
+                                      className="text-xs text-gray-400 hover:text-red-600 p-0.5"
+                                      title="Delete"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
                                 )}
-                                <span className="font-bold text-gray-900 text-sm leading-snug break-words">
-                                  {item.name}
-                                </span>
                               </div>
 
-                              {canManage && (
-                                <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100">
-                                  <button
-                                    onClick={() => handleOpenEdit(item, cat)}
-                                    className="text-xs text-gray-400 hover:text-gray-800 p-0.5"
-                                    title="Edit"
-                                  >
-                                    ✏️
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteItem(item)}
-                                    className="text-xs text-gray-400 hover:text-red-600 p-0.5"
-                                    title="Delete"
-                                  >
-                                    🗑️
-                                  </button>
+                              {/* Brought by (Hidden for Activities!) */}
+                              {!isActivity && item.broughtBy && item.broughtBy !== 'Group Activity' && (
+                                <div className="mt-1 text-xs text-gray-600 font-medium pl-3.5">
+                                  By <strong className="text-gray-900">{item.broughtBy}</strong>
                                 </div>
                               )}
-                            </div>
 
-                            {/* Brought by (Hidden for Activities!) */}
-                            {!isActivity && item.broughtBy && item.broughtBy !== 'Group Activity' && (
-                              <div className="mt-1 text-xs text-gray-600 font-medium pl-3.5">
-                                By <strong className="text-gray-900">{item.broughtBy}</strong>
-                              </div>
-                            )}
-
-                            {/* Need More of this Section (Only for Food/Drinks, not Activities) */}
-                            {!isActivity && (
-                              item.needsMore ? (
-                                <div className="mt-2.5 pt-2 border-t border-gray-100 pl-3.5">
-                                  <div className="flex items-center justify-between text-[11px]">
-                                    <span className="font-bold text-amber-800 flex items-center gap-1">
-                                      <span>🔥</span>
-                                      <span>We have {count} of {target} needed</span>
-                                    </span>
+                              {/* Need More of this Section (Only for Food/Drinks, not Activities) */}
+                              {!isActivity && (
+                                item.needsMore ? (
+                                  <div className="mt-2 pt-1.5 border-t border-gray-100 pl-3.5">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="font-bold text-amber-800 flex items-center gap-1">
+                                        <span>🔥</span>
+                                        <span>We have {count} of {target} needed</span>
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setVolunteerName(getSavedName());
+                                        setClaimingMoreItem(item);
+                                      }}
+                                      className="mt-1.5 w-full py-1 px-2 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg text-[11px] transition text-center"
+                                    >
+                                      + I can bring one too!
+                                    </button>
                                   </div>
-                                  <button
-                                    onClick={() => {
-                                      setVolunteerName(getSavedName());
-                                      setClaimingMoreItem(item);
-                                    }}
-                                    className="mt-1.5 w-full py-1 px-2 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-lg text-[11px] transition text-center"
-                                  >
-                                    + I can bring one too!
-                                  </button>
-                                </div>
-                              ) : (
-                                count > 1 && (
-                                  <div className="mt-2 ml-3.5 inline-flex items-center gap-1 text-[10px] font-bold bg-green-50 text-green-800 border border-green-200 px-2 py-0.5 rounded-md">
-                                    ✓ We have {count} of these covered!
-                                  </div>
+                                ) : (
+                                  count > 1 && (
+                                    <div className="mt-1.5 ml-3.5 inline-flex items-center gap-1 text-[10px] font-bold bg-green-50 text-green-800 border border-green-200 px-2 py-0.5 rounded-md">
+                                      ✓ We have {count} of these covered!
+                                    </div>
+                                  )
                                 )
-                              )
-                            )}
-                          </div>
-                        );
-                      })
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Scroll indicators helper if column has many items */}
+                    {catItems.length > 4 && (
+                      <div className="px-3 py-1 bg-amber-50/50 border-t border-gray-100 flex items-center justify-between text-[10px] text-amber-800/80 font-bold">
+                        <span>Scroll for more ({catItems.length})</span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              const el = document.getElementById(`col-scroll-${cat.id}`);
+                              if (el) el.scrollBy({ top: -120, behavior: 'smooth' });
+                            }}
+                            className="w-5 h-5 flex items-center justify-center rounded bg-white border border-gray-200 hover:bg-amber-100"
+                            title="Scroll up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => {
+                              const el = document.getElementById(`col-scroll-${cat.id}`);
+                              if (el) el.scrollBy({ top: 120, behavior: 'smooth' });
+                            }}
+                            className="w-5 h-5 flex items-center justify-center rounded bg-white border border-gray-200 hover:bg-amber-100"
+                            title="Scroll down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                      </div>
                     )}
-                  </div>
 
-                  {/* Add Button pinned at the bottom */}
-                  <div className="p-2.5 border-t border-gray-100 bg-white/90 rounded-b-2xl">
-                    <button
-                      onClick={() => handleOpenAdd(cat)}
-                      className="w-full py-2 px-3 text-xs font-bold text-gray-700 bg-gray-50 hover:bg-amber-50 hover:text-amber-900 border border-gray-200 hover:border-amber-200 rounded-xl transition flex items-center justify-center gap-1"
-                    >
-                      <span>+</span>
-                      <span>Add to {cat.name}</span>
-                    </button>
+                    {/* Add Button pinned at the bottom */}
+                    <div className="p-2.5 border-t border-gray-100 bg-white/90 rounded-b-2xl flex-shrink-0">
+                      <button
+                        onClick={() => handleOpenAdd(cat)}
+                        className="w-full py-2 px-3 text-xs font-bold text-gray-700 bg-gray-50 hover:bg-amber-50 hover:text-amber-900 border border-gray-200 hover:border-amber-200 rounded-xl transition flex items-center justify-center gap-1"
+                      >
+                        <span>+</span>
+                        <span>Add to {cat.name}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-
-            {/* + Add Column Card */}
-            <div
-              onClick={() => setIsNewCatModalOpen(true)}
-              className="border-2 border-dashed border-amber-900/20 hover:border-amber-500 bg-white/80 hover:bg-white rounded-2xl flex flex-col items-center justify-center min-h-[500px] p-6 text-center cursor-pointer transition select-none shadow-xs"
-            >
-              <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-900 font-bold text-base mb-2">
-                +
-              </div>
-              <span className="font-bold text-xs text-gray-900">
-                Add Category
-              </span>
-              <span className="text-[11px] text-amber-900/60 mt-1">
-                Fit side-by-side
-              </span>
+                );
+              })}
             </div>
           </div>
         )}
