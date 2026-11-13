@@ -755,36 +755,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Duplicate Warning */}
-              {duplicateMatches.length > 0 && (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-1">
-                  <div className="font-bold text-amber-900 flex items-center gap-1">
-                    <span>⚠️</span>
-                    <span>Someone might already be bringing this:</span>
-                  </div>
-                  <ul className="list-disc pl-4 text-gray-700">
-                    {duplicateMatches.map((m) => (
-                      <li key={m.id}>
-                        {m.name} {!isCurrentModalActivity && `(by ${m.broughtBy})`}
-                      </li>
-                    ))}
-                  </ul>
-                  {!bypassWarning ? (
-                    <button
-                      type="button"
-                      onClick={() => setBypassWarning(true)}
-                      className="text-xs font-bold text-amber-800 underline hover:text-amber-900 mt-1 block"
-                    >
-                      I still want to bring my version anyway
-                    </button>
-                  ) : (
-                    <div className="text-[11px] font-bold text-emerald-700">
-                      ✓ Confirmed! You can save now.
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Your Name (Only shown if NOT an Activity) */}
               {!isCurrentModalActivity && (
                 <div>
@@ -843,8 +813,7 @@ export default function App() {
                 </button>
                 <button
                   type="submit"
-                  disabled={duplicateMatches.length > 0 && !bypassWarning}
-                  className="flex-1 py-2 bg-gray-900 hover:bg-black disabled:opacity-50 text-white font-bold rounded-lg text-xs"
+                  className="flex-1 py-2 bg-gray-900 hover:bg-black text-white font-bold rounded-lg text-xs"
                 >
                   {editingItem ? 'Save Changes' : isCurrentModalActivity ? 'Add Activity' : 'Add Item'}
                 </button>
