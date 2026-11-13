@@ -127,7 +127,14 @@ export default function App() {
   const isActivityCat = (cat) => {
     if (!cat) return false;
     const name = (cat.name || '').toLowerCase();
-    return name.includes('activity') || name.includes('game');
+    return name.includes('activit') || name.includes('game') || name.includes('play') || name.includes('fun');
+  };
+
+  const isActivityItem = (item, cat) => {
+    if (cat && isActivityCat(cat)) return true;
+    const itemCat = categories.find(c => c.id === item.categoryId);
+    if (itemCat && isActivityCat(itemCat)) return true;
+    return false;
   };
 
   // Open modal to add item into a column
@@ -640,7 +647,7 @@ export default function App() {
                             </div>
 
                             {/* Brought by (Hidden for Activities!) */}
-                            {!isActivity && (
+                            {!isActivity && item.broughtBy && item.broughtBy !== 'Group Activity' && (
                               <div className="mt-1 text-xs text-gray-600 font-medium pl-3.5">
                                 By <strong className="text-gray-900">{item.broughtBy}</strong>
                               </div>
@@ -719,7 +726,9 @@ export default function App() {
           <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-sm p-5 shadow-xl">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h3 className="font-bold text-base text-gray-900">
-                {editingItem ? 'Edit Item' : `Add to ${targetCategory?.name}`}
+                {editingItem 
+                  ? (isCurrentModalActivity ? 'Edit Activity Idea' : 'Edit Item') 
+                  : (isCurrentModalActivity ? 'Add Activity Idea' : `Add to ${targetCategory?.name}`)}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
