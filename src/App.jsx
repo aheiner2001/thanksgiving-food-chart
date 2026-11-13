@@ -713,17 +713,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Seamless Thanksgiving Harvest Border at the bottom */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 h-20 sm:h-24 pointer-events-none select-none z-10 opacity-90"
-        style={{
-          backgroundImage: 'url("./harvest-border.jpg")',
-          backgroundRepeat: 'repeat-x',
-          backgroundPosition: 'bottom center',
-          backgroundSize: 'auto 100%'
-        }}
-      />
-
       {/* Modal: Add or Edit Item (Streamlined: No Category dropdown, No Servings, No Name for Activities) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
