@@ -32,10 +32,12 @@ This file provides persistent instructions, rules, and design guidelines for AI 
 
 ### 4. Firestore & Permissions Policy
 * Always verify that Firestore rules match collection schemas whenever new fields or collections are introduced.
+* **Automatic Rule Deployment**: Whenever `firestore.rules` is updated or modified, the agent MUST immediately deploy the rules to Firebase via `firebase deploy --only firestore:rules` to ensure live environments never fall out of sync.
 * For the Thanksgiving app, guest reads/writes do not require authentication (`request.auth == null` allowed for family ease).
 * `suggestions` collection must allow `categoryId` to be omitted/null.
 
 ### 5. Verification Checklist (Run Before Every Push)
 1. Run `npm run build` to ensure zero compilation or asset reference errors.
-2. Verify responsive layout on mobile (<640px), tablet (768px-1024px), and desktop (>1280px).
-3. Test edge case: Adding 1, 2, or 3 extra categories to ensure grid wraps/compresses cleanly.
+2. If `firestore.rules` was touched, verify `firebase deploy --only firestore:rules` has succeeded.
+3. Verify responsive layout on mobile (<640px), tablet (768px-1024px), and desktop (>1280px).
+4. Test edge case: Adding 1, 2, or 3 extra categories to ensure grid wraps/compresses cleanly.
