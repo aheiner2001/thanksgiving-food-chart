@@ -659,15 +659,29 @@ export default function App() {
                 const isActivity = isActivityCat(cat);
                 let catItems = items.filter((it) => it.categoryId === cat.id);
 
-                // If activity category, sort items by rating average (highest first), then rating count, then name
+                // If activity category, rank items using Bayesian weighted rating so crowd favorites beat single 5-star flukes
                 if (isActivity) {
+                  const getBayesianScore = (it) => {
+                    const ratings = it.ratings ? Object.values(it.ratings) : [];
+                    const v = ratings.length;
+                    if (v === 0) return 0;
+                    const sum = ratings.reduce((acc, val) => acc + val, 0);
+                    const C = 2;   // minimum vote weight confidence
+                    const M = 3.0; // neutral prior score (3 stars)
+                    return (C * M + sum) / (C + v);
+                  };
+
                   catItems = [...catItems].sort((a, b) => {
-                    const avgA = a.ratingAverage || 0;
-                    const avgB = b.ratingAverage || 0;
-                    if (avgB !== avgA) return avgB - avgA;
+                    const scoreA = getBayesianScore(a);
+                    const scoreB = getBayesianScore(b);
+                    if (scoreB !== scoreA) return scoreB - scoreA;
+
+                    // Tie-breaker 1: Total vote count
                     const countA = a.ratingCount || 0;
                     const countB = b.ratingCount || 0;
                     if (countB !== countA) return countB - countA;
+
+                    // Tie-breaker 2: Alphabetical name
                     return (a.name || '').localeCompare(b.name || '');
                   });
                 }
