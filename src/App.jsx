@@ -346,7 +346,54 @@ export default function App() {
 
   const handleDeleteSuggestion = async (sug, e) => {
     e.stopPropagation();
-    await deleteDoc(doc(db, 'suggestions', sug.id));
+    if (confirm(`Remove "${sug.name}" from suggestions?`)) {
+      await deleteDoc(doc(db, 'suggestions', sug.id));
+    }
+  };
+
+  // Toggle upvote on a suggestion
+  const handleToggleSuggestionUpvote = async (sug, e) => {
+    e.stopPropagation();
+    try {
+      const upvotes = Array.isArray(sug.upvotes) ? sug.upvotes : [];
+      const hasUpvoted = upvotes.includes(myOwnerId);
+      const newUpvotes = hasUpvoted
+        ? upvotes.filter(id => id !== myOwnerId)
+        : [...upvotes, myOwnerId];
+
+      await updateDoc(doc(db, 'suggestions', sug.id), {
+        upvotes: newUpvotes,
+        upvoteCount: newUpvotes.length
+      });
+    } catch (err) {
+      alert('Error updating upvote: ' + err.message);
+    }
+  };
+
+  // Set 1-5 rating on an activity item
+  const handleRateActivity = async (item, ratingValue, e) => {
+    e.stopPropagation();
+    try {
+      const ratings = { ...(item.ratings || {}) };
+      // Clicking the same rating again un-rates it (toggles off)
+      if (ratings[myOwnerId] === ratingValue) {
+        delete ratings[myOwnerId];
+      } else {
+        ratings[myOwnerId] = ratingValue;
+      }
+
+      const values = Object.values(ratings);
+      const count = values.length;
+      const average = count > 0 ? (values.reduce((sum, v) => sum + v, 0) / count) : 0;
+
+      await updateDoc(doc(db, 'items', item.id), {
+        ratings,
+        ratingCount: count,
+        ratingAverage: Math.round(average * 10) / 10
+      });
+    } catch (err) {
+      alert('Error saving rating: ' + err.message);
+    }
   };
 
   // DRAG & DROP
@@ -507,37 +554,73 @@ export default function App() {
           </div>
         ) : (
           <div className="flex flex-wrap gap-2.5 items-center">
-            {suggestions.map((sug) => {
-              return (
-                <div
-                  key={sug.id}
-                  draggable
-                  onDragStart={(e) => handleDragStartSuggestion(e, sug)}
-                  onClick={() => {
-                    setVolunteerName(getSavedName());
-                    setClaimingSuggestion(sug);
-                    setDraggedTargetCat(categories[0] || null);
-                  }}
-                  className="group cursor-grab active:cursor-grabbing bg-amber-50/90 hover:bg-amber-100 border border-amber-300 hover:border-amber-500 hover:shadow-md px-3.5 py-1.5 rounded-full flex items-center gap-2 transition select-none text-xs"
-                  title="Drag into any column or click to claim!"
-                >
-                  <span className="text-amber-700">⠿</span>
-                  <span className="font-bold text-gray-900">
-                    {sug.name}
-                  </span>
-                  <span className="text-xs text-amber-700 font-bold group-hover:text-amber-900">
-                    Claim →
-                  </span>
-                  <button
-                    onClick={(e) => handleDeleteSuggestion(sug, e)}
-                    className="text-gray-400 hover:text-red-500 ml-0.5 text-xs font-bold"
-                    title="Remove suggestion"
+            {[...suggestions]
+              .sort((a, b) => {
+                const countA = Array.isArray(a.upvotes) ? a.upvotes.length : (a.upvoteCount || 0);
+                const countB = Array.isArray(b.upvotes) ? b.upvotes.length : (b.upvoteCount || 0);
+                if (countB !== countA) return countB - countA;
+                return (a.name || '').localeCompare(b.name || '');
+              })
+              .map((sug) => {
+                const upvotes = Array.isArray(sug.upvotes) ? sug.upvotes : [];
+                const upvoteCount = upvotes.length || sug.upvoteCount || 0;
+                const hasUpvoted = upvotes.includes(myOwnerId);
+
+                return (
+                  <div
+                    key={sug.id}
+                    draggable
+                    onDragStart={(e) => handleDragStartSuggestion(e, sug)}
+                    className="group cursor-grab active:cursor-grabbing bg-white hover:bg-amber-50/80 border border-amber-200 hover:border-amber-400 shadow-xs hover:shadow-sm pl-3 pr-2 py-1.5 rounded-full flex items-center gap-2 transition select-none text-xs"
+                    title="Drag into any column, upvote, or click Claim"
                   >
-                    ✕
-                  </button>
-                </div>
-              );
-            })}
+                    <span className="text-amber-600/70 select-none">⠿</span>
+                    <span className="font-bold text-gray-900 text-xs">
+                      {sug.name}
+                    </span>
+
+                    {/* Upvote Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleSuggestionUpvote(sug, e)}
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 transition ${
+                        hasUpvoted
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'bg-amber-100/70 hover:bg-amber-200 text-amber-900'
+                      }`}
+                      title={hasUpvoted ? 'Remove your upvote' : 'Upvote this idea'}
+                    >
+                      <span>👍</span>
+                      {upvoteCount > 0 && <span>{upvoteCount}</span>}
+                    </button>
+
+                    {/* Claim Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setVolunteerName(getSavedName());
+                        setClaimingSuggestion(sug);
+                        setDraggedTargetCat(categories[0] || null);
+                      }}
+                      className="px-2.5 py-0.5 bg-gray-900 hover:bg-black text-white text-[11px] font-bold rounded-full transition"
+                      title="Claim this idea for the event"
+                    >
+                      Claim
+                    </button>
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteSuggestion(sug, e)}
+                      className="text-gray-300 hover:text-red-500 p-0.5 text-xs font-bold transition ml-0.5"
+                      title="Remove suggestion"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
           </div>
         )}
       </section>
@@ -573,10 +656,24 @@ export default function App() {
               }}
             >
               {categories.map((cat) => {
-                const catItems = items.filter((it) => it.categoryId === cat.id);
+                const isActivity = isActivityCat(cat);
+                let catItems = items.filter((it) => it.categoryId === cat.id);
+
+                // If activity category, sort items by rating average (highest first), then rating count, then name
+                if (isActivity) {
+                  catItems = [...catItems].sort((a, b) => {
+                    const avgA = a.ratingAverage || 0;
+                    const avgB = b.ratingAverage || 0;
+                    if (avgB !== avgA) return avgB - avgA;
+                    const countA = a.ratingCount || 0;
+                    const countB = b.ratingCount || 0;
+                    if (countB !== countA) return countB - countA;
+                    return (a.name || '').localeCompare(b.name || '');
+                  });
+                }
+
                 const isEmpty = catItems.length === 0;
                 const isDragOver = dragOverColId === cat.id;
-                const isActivity = isActivityCat(cat);
                 const isDense = catItems.length > 5; // compact when many items
 
                 return (
@@ -686,6 +783,54 @@ export default function App() {
                               {!isActivity && item.broughtBy && item.broughtBy !== 'Group Activity' && (
                                 <div className="mt-1 text-xs text-gray-600 font-medium pl-3.5">
                                   By <strong className="text-gray-900">{item.broughtBy}</strong>
+                                </div>
+                              )}
+
+                              {/* Activity Anonymous Interest Rating Section (1 to 5 Stars/Level) */}
+                              {isActivity && (
+                                <div className="mt-2.5 pt-2 border-t border-gray-100 flex flex-col gap-1.5">
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <span className="text-gray-500 font-medium">Interest level:</span>
+                                    <span className="font-bold text-amber-900 flex items-center gap-1">
+                                      {item.ratingCount ? (
+                                        <>
+                                          <span className="text-amber-500">★</span>
+                                          <span>{item.ratingAverage?.toFixed(1) || '0.0'}</span>
+                                          <span className="text-gray-400 font-normal">({item.ratingCount} {item.ratingCount === 1 ? 'vote' : 'votes'})</span>
+                                        </>
+                                      ) : (
+                                        <span className="text-gray-400 font-normal">Be first to rate</span>
+                                      )}
+                                    </span>
+                                  </div>
+
+                                  {/* 1-5 Interactive Rating Selector */}
+                                  <div className="flex items-center justify-between bg-amber-50/60 p-1 rounded-lg border border-amber-200/60">
+                                    {[1, 2, 3, 4, 5].map((lvl) => {
+                                      const userVote = item.ratings && item.ratings[myOwnerId];
+                                      const isSelected = userVote === lvl;
+                                      const isFilled = userVote >= lvl;
+
+                                      return (
+                                        <button
+                                          key={lvl}
+                                          type="button"
+                                          onClick={(e) => handleRateActivity(item, lvl, e)}
+                                          title={`Rate ${lvl} / 5 (Click again to remove)`}
+                                          className={`flex-1 py-1 px-0.5 rounded text-xs font-bold transition flex flex-col items-center justify-center ${
+                                            isSelected
+                                              ? 'bg-amber-500 text-white shadow-xs scale-105'
+                                              : isFilled
+                                              ? 'text-amber-600 bg-amber-100/70 hover:bg-amber-200'
+                                              : 'text-gray-400 hover:text-amber-600 hover:bg-white/80'
+                                          }`}
+                                        >
+                                          <span className="text-sm leading-none">★</span>
+                                          <span className="text-[9px] mt-0.5 leading-none">{lvl}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               )}
 
