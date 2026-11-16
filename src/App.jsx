@@ -218,7 +218,6 @@ export default function App() {
 
   // Delete item
   const handleDeleteItem = async (item) => {
-    if (!isAdmin && item.ownerId !== myOwnerId) return;
     if (confirm(`Remove "${item.name}"?`)) {
       await deleteDoc(doc(db, 'items', item.id));
     }
@@ -432,11 +431,6 @@ export default function App() {
     if (draggedItem.type === 'item') {
       const item = draggedItem.data;
       if (item.categoryId === targetCat.id) return;
-
-      if (!isAdmin && item.ownerId !== myOwnerId) {
-        alert("You can only move dishes that you added.");
-        return;
-      }
 
       try {
         await updateDoc(doc(db, 'items', item.id), {
@@ -745,52 +739,44 @@ export default function App() {
                         </div>
                       ) : (
                         catItems.map((item) => {
-                          const isOwner = item.ownerId === myOwnerId;
-                          const canManage = isAdmin || isOwner;
                           const count = item.currentCount || 1;
                           const target = item.targetCount || (item.needsMore ? 2 : 1);
 
                           return (
                             <div
                               key={item.id}
-                              draggable={canManage}
+                              draggable
                               onDragStart={(e) => handleDragStartItem(e, item)}
-                              className={`bg-white border rounded-xl shadow-xs hover:border-amber-300 hover:shadow-md transition group ${
+                              className={`bg-white border rounded-xl shadow-xs hover:border-amber-300 hover:shadow-md transition group cursor-grab active:cursor-grabbing ${
                                 isDense ? 'p-2 text-xs' : 'p-3'
-                              } ${
-                                canManage ? 'cursor-grab active:cursor-grabbing' : ''
                               } border-gray-200`}
                             >
                               <div className="flex items-start justify-between gap-1.5">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  {canManage && (
-                                    <span className="text-gray-300 group-hover:text-amber-500 text-xs select-none flex-shrink-0" title="Drag to move column">
-                                      ⠿
-                                    </span>
-                                  )}
+                                  <span className="text-gray-300 group-hover:text-amber-500 text-xs select-none flex-shrink-0" title="Drag to move column">
+                                    ⠿
+                                  </span>
                                   <span className="font-bold text-gray-900 text-sm leading-snug break-words">
                                     {item.name}
                                   </span>
                                 </div>
 
-                                {canManage && (
-                                  <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 flex-shrink-0">
-                                    <button
-                                      onClick={() => handleOpenEdit(item, cat)}
-                                      className="text-xs text-gray-400 hover:text-gray-800 p-0.5"
-                                      title="Edit"
-                                    >
-                                      ✏️
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteItem(item)}
-                                      className="text-xs text-gray-400 hover:text-red-600 p-0.5"
-                                      title="Delete"
-                                    >
-                                      🗑️
-                                    </button>
-                                  </div>
-                                )}
+                                <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 flex-shrink-0">
+                                  <button
+                                    onClick={() => handleOpenEdit(item, cat)}
+                                    className="text-xs text-gray-400 hover:text-gray-800 p-0.5"
+                                    title="Edit"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteItem(item)}
+                                    className="text-xs text-gray-400 hover:text-red-600 p-0.5"
+                                    title="Delete"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Brought by (Hidden for Activities!) */}
