@@ -57,6 +57,11 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
   const [dragCreation, setDragCreation] = useState(null);
   // { day: 'Thu', start: 14, currentEnd: 15.5, isVertical: false }
 
+  // Hovered / Pressed Event Popup state
+  const [previewEvent, setPreviewEvent] = useState(null);
+  const [previewPos, setPreviewPos] = useState({ x: 0, y: 0 });
+  const [longPressTimer, setLongPressTimer] = useState(null);
+
   // Sync with Firestore collection `calendar_events`
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'calendar_events')), (snapshot) => {
@@ -153,6 +158,7 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
   // Click & Drag to create an event on desktop horizontal track
   const handleDesktopTrackPointerDown = (dayId, trackEl, e) => {
+    setPreviewEvent(null);
     // Ignore if clicked on an event card or child element of an event card
     if (e.target.closest('[id^="d-card-"]')) return;
     if (e.button !== 0) return; // Only left click
@@ -204,6 +210,7 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
   // Click & Drag to create an event on mobile vertical track
   const handleMobileTrackPointerDown = (dayId, trackEl, e) => {
+    setPreviewEvent(null);
     if (e.target.closest('[id^="m-card-"]')) return;
     if (e.button !== 0) return;
 
@@ -263,6 +270,44 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
       } catch (err) {
         alert("Error clearing schedule: " + err.message);
       }
+    }
+  };
+
+  // Desktop hover preview handlers
+  const handleMouseEnterCard = (evt, e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPreviewPos({
+      x: Math.min(Math.max(rect.left + rect.width / 2, 140), window.innerWidth - 140),
+      y: rect.top < 220 ? rect.bottom + 8 : rect.top - 8,
+      placeAbove: rect.top >= 220
+    });
+    setPreviewEvent(evt);
+  };
+
+  const handleMouseLeaveCard = () => {
+    setPreviewEvent(null);
+  };
+
+  // Mobile long-press handlers
+  const handleTouchStartCard = (evt, e) => {
+    const touch = e.touches ? e.touches[0] : e;
+    const clientX = touch.clientX;
+    const clientY = touch.clientY;
+    const timer = setTimeout(() => {
+      setPreviewPos({
+        x: Math.min(Math.max(clientX, 140), window.innerWidth - 140),
+        y: clientY < 220 ? clientY + 20 : clientY - 20,
+        placeAbove: clientY >= 220
+      });
+      setPreviewEvent(evt);
+    }, 450); // 450ms long-press
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchEndCard = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
     }
   };
 
@@ -610,6 +655,11 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                         key={evt.id}
                         id={`m-card-${evt.id}`}
                         onPointerDown={(e) => startDragVertical(evt, document.getElementById(`m-card-${evt.id}`), e)}
+                        onTouchStart={(e) => handleTouchStartCard(evt, e)}
+                        onTouchEnd={handleTouchEndCard}
+                        onTouchMove={handleTouchEndCard}
+                        onMouseEnter={(e) => handleMouseEnterCard(evt, e)}
+                        onMouseLeave={handleMouseLeaveCard}
                         style={{ top: `${top}px`, height: `${height}px` }}
                         className={`absolute left-2 right-2 rounded-xl shadow-xs border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing select-none group touch-none ${getCardColorClass()}`}
                       >
@@ -738,6 +788,11 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                             key={evt.id}
                             id={`d-card-${evt.id}`}
                             onPointerDown={(e) => startDragHorizontal(evt, document.getElementById(`d-card-${evt.id}`), e)}
+                            onMouseEnter={(e) => handleMouseEnterCard(evt, e)}
+                            onMouseLeave={handleMouseLeaveCard}
+                            onTouchStart={(e) => handleTouchStartCard(evt, e)}
+                            onTouchEnd={handleTouchEndCard}
+                            onTouchMove={handleTouchEndCard}
                             style={{ left: `${left}px`, width: `${width}px` }}
                             className={`absolute top-2.5 h-[76px] rounded-xl shadow-xs border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing select-none group touch-none ${getCardColorClass()}`}
                           >
@@ -809,6 +864,69 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
           </div>
         </div>
       </div>
+
+      {/* Event Details Quick-Pop Preview (Desktop Hover or Mobile Long-Press) */}
+      {previewEvent && (
+        <div
+          style={{
+            left: `${previewPos.x}px`,
+            top: `${previewPos.y}px`,
+            transform: previewPos.placeAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)'
+          }}
+          className="fixed z-[80] w-72 max-w-[90vw] bg-white border border-amber-900/20 rounded-2xl p-4 shadow-2xl pointer-events-auto animate-in fade-in zoom-in-95 duration-150"
+          onMouseEnter={() => setPreviewEvent(previewEvent)}
+          onMouseLeave={handleMouseLeaveCard}
+        >
+          <div className="flex items-start justify-between gap-2 border-b border-amber-900/10 pb-2 mb-2">
+            <div>
+              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900">
+                {DAYS.find(d => d.id === previewEvent.day)?.name || previewEvent.day}
+              </span>
+              <div className="text-xs font-bold text-amber-900 mt-1">
+                {formatTime(previewEvent.start)} - {formatTime(previewEvent.start + previewEvent.duration)}
+                <span className="text-gray-400 font-normal ml-1">({previewEvent.duration} {previewEvent.duration === 1 ? 'hr' : 'hrs'})</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  handleOpenEditEvent(previewEvent, e);
+                  setPreviewEvent(null);
+                }}
+                className="p-1 text-gray-500 hover:text-amber-800 hover:bg-amber-50 rounded-lg text-xs"
+                title="Edit"
+              >
+                ✏️
+              </button>
+              <button
+                onClick={() => setPreviewEvent(null)}
+                className="p-1 text-gray-400 hover:text-gray-800 rounded-lg text-xs"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <h4 className="font-bold text-sm text-gray-900 mb-1.5 leading-snug">
+            {previewEvent.title}
+          </h4>
+
+          {previewEvent.location && (
+            <div className="text-xs text-gray-700 flex items-start gap-1.5 mb-1">
+              <span>📍</span>
+              <span className="font-medium">{previewEvent.location}</span>
+            </div>
+          )}
+
+          {previewEvent.address && (
+            <div className="text-xs text-gray-600 flex items-start gap-1.5">
+              <span>🏠</span>
+              <span>{previewEvent.address}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add / Edit Submodal */}
       {isEventFormOpen && (
