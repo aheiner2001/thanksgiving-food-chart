@@ -95,21 +95,10 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
   // Sync with Firestore collection `calendar_events`
   useEffect(() => {
-    const unsub = onSnapshot(query(collection(db, 'calendar_events')), async (snapshot) => {
-      if (snapshot.empty) {
-        // Initialize with default events
-        for (const item of INITIAL_DEFAULT_EVENTS) {
-          const { id, ...data } = item;
-          await addDoc(collection(db, 'calendar_events'), {
-            ...data,
-            createdAt: serverTimestamp()
-          });
-        }
-      } else {
-        const evList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        setEvents(evList);
-        setLoading(false);
-      }
+    const unsub = onSnapshot(query(collection(db, 'calendar_events')), (snapshot) => {
+      const evList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setEvents(evList);
+      setLoading(false);
     });
 
     return () => unsub();
@@ -299,22 +288,16 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
     window.addEventListener('pointerup', onPointerUp);
   };
 
-  // Reset to default schedule
-  const handleResetSchedule = async () => {
-    if (window.confirm("Reset all itinerary events back to the recommended schedule?")) {
+  // Clear all itinerary events
+  const handleClearSchedule = async () => {
+    if (events.length === 0) return;
+    if (window.confirm("Clear all events from the calendar schedule?")) {
       try {
         for (const evt of events) {
           await deleteDoc(doc(db, 'calendar_events', evt.id));
         }
-        for (const item of INITIAL_DEFAULT_EVENTS) {
-          const { id, ...data } = item;
-          await addDoc(collection(db, 'calendar_events'), {
-            ...data,
-            createdAt: serverTimestamp()
-          });
-        }
       } catch (err) {
-        alert("Error resetting schedule: " + err.message);
+        alert("Error clearing schedule: " + err.message);
       }
     }
   };
@@ -543,13 +526,15 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleResetSchedule}
-              className="px-2.5 sm:px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition"
-              title="Reset to default family schedule"
-            >
-              ↺ Reset
-            </button>
+            {events.length > 0 && (
+              <button
+                onClick={handleClearSchedule}
+                className="px-2.5 sm:px-3 py-1.5 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-700 text-xs font-bold rounded-lg transition"
+                title="Clear all events from schedule"
+              >
+                🗑 Clear All
+              </button>
+            )}
             <button
               onClick={() => handleOpenAddEvent()}
               className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition shadow-xs flex items-center gap-1"
@@ -671,10 +656,10 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                       >
                         {/* Top Resize Handle */}
                         <div
-                          className="vert-resize-handle absolute top-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center"
+                          className="vert-resize-handle absolute top-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           onPointerDown={(e) => startResizeVertical(evt, 'top', document.getElementById(`m-card-${evt.id}`), e)}
                         >
-                          <div className="w-8 h-1 bg-black/15 rounded-full" />
+                          <div className="w-8 h-1 bg-black/20 rounded-full" />
                         </div>
 
                         {/* Card Content */}
@@ -707,10 +692,10 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
                         {/* Bottom Resize Handle */}
                         <div
-                          className="vert-resize-handle absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center"
+                          className="vert-resize-handle absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           onPointerDown={(e) => startResizeVertical(evt, 'bottom', document.getElementById(`m-card-${evt.id}`), e)}
                         >
-                          <div className="w-8 h-1 bg-black/15 rounded-full" />
+                          <div className="w-8 h-1 bg-black/20 rounded-full" />
                         </div>
                       </div>
                     );
@@ -797,10 +782,10 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                           >
                             {/* Left Handle */}
                             <div
-                              className="horiz-resize-handle absolute top-0 bottom-0 left-0 w-3 cursor-ew-resize flex items-center justify-center z-10"
+                              className="horiz-resize-handle absolute top-0 bottom-0 left-0 w-3 cursor-ew-resize flex items-center justify-center z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                               onPointerDown={(e) => startResizeHorizontal(evt, 'left', document.getElementById(`d-card-${evt.id}`), e)}
                             >
-                              <div className="w-1 h-6 bg-black/15 group-hover:bg-amber-600 rounded-full" />
+                              <div className="w-1 h-6 bg-amber-700/60 rounded-full" />
                             </div>
 
                             {/* Card Body */}
@@ -839,10 +824,10 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
                             {/* Right Handle */}
                             <div
-                              className="horiz-resize-handle absolute top-0 bottom-0 right-0 w-3 cursor-ew-resize flex items-center justify-center z-10"
+                              className="horiz-resize-handle absolute top-0 bottom-0 right-0 w-3 cursor-ew-resize flex items-center justify-center z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                               onPointerDown={(e) => startResizeHorizontal(evt, 'right', document.getElementById(`d-card-${evt.id}`), e)}
                             >
-                              <div className="w-1 h-6 bg-black/15 group-hover:bg-amber-600 rounded-full" />
+                              <div className="w-1 h-6 bg-amber-700/60 rounded-full" />
                             </div>
                           </div>
                         );
@@ -858,8 +843,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
       {/* Add / Edit Submodal */}
       {isEventFormOpen && (
-        <div className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-3">
-          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm p-5 shadow-2xl animate-in zoom-in-95 duration-100">
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-3 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm p-5 shadow-2xl animate-in zoom-in-95 duration-100 relative z-[71]">
             <h3 className="font-bold text-base text-gray-900 mb-3">
               {editingEventId ? "Edit Event" : "Add Itinerary Event"}
             </h3>
