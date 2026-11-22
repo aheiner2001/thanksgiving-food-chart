@@ -89,6 +89,10 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
   const [formGroup, setFormGroup] = useState('both-houses');
   const [formLocation, setFormLocation] = useState('');
 
+  // Drag-to-create state (Desktop and Mobile track dragging)
+  const [dragCreation, setDragCreation] = useState(null);
+  // { day: 'Thu', start: 14, currentEnd: 15.5, isVertical: false }
+
   // Sync with Firestore collection `calendar_events`
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'calendar_events')), async (snapshot) => {
@@ -130,12 +134,12 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
   const currentDay = DAYS[activeDayIndex];
 
-  const handleOpenAddEvent = (dayId = currentDay.id) => {
+  const handleOpenAddEvent = (dayId = currentDay.id, defaultStart = 12, defaultDuration = 1) => {
     setEditingEventId(null);
     setFormTitle('');
     setFormDay(dayId);
-    setFormStart(12);
-    setFormDuration(2);
+    setFormStart(defaultStart);
+    setFormDuration(defaultDuration);
     setFormGroup('both-houses');
     setFormLocation('');
     setIsEventFormOpen(true);
@@ -192,6 +196,107 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
     } catch (err) {
       alert("Error saving event: " + err.message);
     }
+  };
+
+  // Click & Drag to create an event on desktop horizontal track
+  const handleDesktopTrackPointerDown = (dayId, trackEl, e) => {
+    // Ignore if clicked on an event card or child element of an event card
+    if (e.target.closest('[id^="d-card-"]')) return;
+    if (e.button !== 0) return; // Only left click
+
+    const trackRect = trackEl.getBoundingClientRect();
+    const clickX = e.clientX - trackRect.left;
+    const rawHour = START_HOUR + clickX / DESKTOP_HOUR_W;
+    const initialStart = Math.min(Math.max(Math.floor(rawHour * 2) / 2, START_HOUR), END_HOUR - 0.5);
+
+    let currentEnd = initialStart + 0.5;
+    let didDrag = false;
+
+    setDragCreation({
+      day: dayId,
+      start: initialStart,
+      end: currentEnd,
+      isVertical: false
+    });
+
+    const onPointerMove = (me) => {
+      const moveX = me.clientX - trackRect.left;
+      if (Math.abs(me.clientX - e.clientX) > 6) {
+        didDrag = true;
+      }
+      const moveHour = START_HOUR + moveX / DESKTOP_HOUR_W;
+      const snappedEnd = Math.round(moveHour * 4) / 4;
+      currentEnd = Math.min(Math.max(snappedEnd, initialStart + 0.5), END_HOUR);
+
+      setDragCreation({
+        day: dayId,
+        start: initialStart,
+        end: currentEnd,
+        isVertical: false
+      });
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      setDragCreation(null);
+
+      const duration = didDrag ? Math.max(Math.round((currentEnd - initialStart) * 4) / 4, 0.5) : 1;
+      handleOpenAddEvent(dayId, initialStart, duration);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
+  // Click & Drag to create an event on mobile vertical track
+  const handleMobileTrackPointerDown = (dayId, trackEl, e) => {
+    if (e.target.closest('[id^="m-card-"]')) return;
+    if (e.button !== 0) return;
+
+    const trackRect = trackEl.getBoundingClientRect();
+    const clickY = e.clientY - trackRect.top;
+    const rawHour = START_HOUR + clickY / MOBILE_HOUR_H;
+    const initialStart = Math.min(Math.max(Math.floor(rawHour * 2) / 2, START_HOUR), END_HOUR - 0.5);
+
+    let currentEnd = initialStart + 0.5;
+    let didDrag = false;
+
+    setDragCreation({
+      day: dayId,
+      start: initialStart,
+      end: currentEnd,
+      isVertical: true
+    });
+
+    const onPointerMove = (me) => {
+      const moveY = me.clientY - trackRect.top;
+      if (Math.abs(me.clientY - e.clientY) > 6) {
+        didDrag = true;
+      }
+      const moveHour = START_HOUR + moveY / MOBILE_HOUR_H;
+      const snappedEnd = Math.round(moveHour * 4) / 4;
+      currentEnd = Math.min(Math.max(snappedEnd, initialStart + 0.5), END_HOUR);
+
+      setDragCreation({
+        day: dayId,
+        start: initialStart,
+        end: currentEnd,
+        isVertical: true
+      });
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      setDragCreation(null);
+
+      const duration = didDrag ? Math.max(Math.round((currentEnd - initialStart) * 4) / 4, 0.5) : 1;
+      handleOpenAddEvent(dayId, initialStart, duration);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
   };
 
   // Reset to default schedule
@@ -432,7 +537,7 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                 Thanksgiving Week 2026 Itinerary
               </h2>
               <p className="text-xs text-amber-900/70 font-medium hidden sm:block">
-                Nov 24 – Nov 29, 2026 • Drag to move time, drag handles on edges to resize
+                Nov 24 – Nov 29, 2026 • Click anywhere to add, or click &amp; drag across time to set length
               </p>
             </div>
           </div>
@@ -531,11 +636,25 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
               {/* Vertical Events Track */}
               <div 
-                className="flex-1 relative"
+                id={`m-track-${currentDay.id}`}
+                onPointerDown={(e) => handleMobileTrackPointerDown(currentDay.id, document.getElementById(`m-track-${currentDay.id}`), e)}
+                className="flex-1 relative cursor-crosshair"
                 style={{
                   backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${MOBILE_HOUR_H - 1}px, #e8dfd5 ${MOBILE_HOUR_H - 1}px, #e8dfd5 ${MOBILE_HOUR_H}px)`
                 }}
               >
+                {/* Active creation ghost overlay */}
+                {dragCreation && dragCreation.isVertical && dragCreation.day === currentDay.id && (
+                  <div
+                    style={{
+                      top: `${(dragCreation.start - START_HOUR) * MOBILE_HOUR_H}px`,
+                      height: `${Math.max((dragCreation.end - dragCreation.start) * MOBILE_HOUR_H, 24)}px`
+                    }}
+                    className="absolute left-2 right-2 rounded-xl border-2 border-dashed border-amber-600 bg-amber-200/50 z-20 pointer-events-none flex items-center justify-center p-2 text-xs font-bold text-amber-900"
+                  >
+                    + New Event ({formatTime(dragCreation.start)} - {formatTime(dragCreation.end)})
+                  </div>
+                )}
                 {events
                   .filter(e => e.day === currentDay.id)
                   .map(evt => {
@@ -644,12 +763,26 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
                     {/* Track */}
                     <div
-                      className="flex-grow relative h-full min-h-[96px]"
+                      id={`d-track-${day.id}`}
+                      onPointerDown={(e) => handleDesktopTrackPointerDown(day.id, document.getElementById(`d-track-${day.id}`), e)}
+                      className="flex-grow relative h-full min-h-[96px] cursor-crosshair"
                       style={{
                         width: `${TOTAL_HOURS * DESKTOP_HOUR_W}px`,
                         backgroundImage: `repeating-linear-gradient(to right, transparent, transparent ${DESKTOP_HOUR_W - 1}px, #e8dfd5 ${DESKTOP_HOUR_W - 1}px, #e8dfd5 ${DESKTOP_HOUR_W}px)`
                       }}
                     >
+                      {/* Active creation ghost overlay */}
+                      {dragCreation && !dragCreation.isVertical && dragCreation.day === day.id && (
+                        <div
+                          style={{
+                            left: `${(dragCreation.start - START_HOUR) * DESKTOP_HOUR_W}px`,
+                            width: `${Math.max((dragCreation.end - dragCreation.start) * DESKTOP_HOUR_W, 30)}px`
+                          }}
+                          className="absolute top-2.5 h-[76px] rounded-xl border-2 border-dashed border-amber-600 bg-amber-200/50 z-20 pointer-events-none flex items-center justify-center p-1 text-xs font-bold text-amber-900 text-center"
+                        >
+                          + New ({formatTime(dragCreation.start)} - {formatTime(dragCreation.end)})
+                        </div>
+                      )}
                       {dayEvents.map(evt => {
                         const left = (evt.start - START_HOUR) * DESKTOP_HOUR_W;
                         const width = Math.max(evt.duration * DESKTOP_HOUR_W, 40);
