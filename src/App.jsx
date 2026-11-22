@@ -10,7 +10,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { getOwnerId, getSavedName, saveGuestName, findSimilarItems } from './utils';
+import { getOwnerId, getSavedName, saveGuestName } from './utils';
 import CalendarModal from './CalendarModal';
 
 const DEFAULT_CATEGORIES = [
@@ -66,10 +66,6 @@ export default function App() {
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverColId, setDragOverColId] = useState(null);
 
-  // Duplicate warning
-  const [duplicateMatches, setDuplicateMatches] = useState([]);
-  const [bypassWarning, setBypassWarning] = useState(false);
-
   // Check admin
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -118,17 +114,6 @@ export default function App() {
     };
   }, []);
 
-  // Check duplicate matches
-  useEffect(() => {
-    if (itemName.trim().length >= 3) {
-      const matches = findSimilarItems(itemName, items, editingItem ? editingItem.id : null);
-      setDuplicateMatches(matches);
-    } else {
-      setDuplicateMatches([]);
-    }
-    setBypassWarning(false);
-  }, [itemName, editingItem, items]);
-
   const isActivityCat = (cat) => {
     if (!cat) return false;
     const name = (cat.name || '').toLowerCase();
@@ -150,8 +135,6 @@ export default function App() {
     setBroughtBy(getSavedName());
     setNeedsMore(false);
     setTargetCount(2);
-    setDuplicateMatches([]);
-    setBypassWarning(false);
     setIsModalOpen(true);
   };
 
@@ -163,8 +146,6 @@ export default function App() {
     setBroughtBy(item.broughtBy || getSavedName());
     setNeedsMore(!!item.needsMore);
     setTargetCount(item.targetCount || 2);
-    setDuplicateMatches([]);
-    setBypassWarning(false);
     setIsModalOpen(true);
   };
 
@@ -187,10 +168,6 @@ export default function App() {
       saveGuestName(finalBroughtBy);
     } else {
       finalBroughtBy = finalBroughtBy || 'Group Activity';
-    }
-
-    if (duplicateMatches.length > 0 && !bypassWarning) {
-      return;
     }
 
     try {

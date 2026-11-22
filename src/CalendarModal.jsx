@@ -777,14 +777,14 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
           {/* DESKTOP ONLY: Full Horizontal Multi-Day Timeline View */}
           <div className="hidden md:block bg-white border border-amber-900/15 rounded-xl shadow-xs overflow-x-auto">
-            <div className="min-w-[1400px] flex flex-col">
+            <div className="w-max min-w-full flex flex-col">
               
               {/* Header Row with Hours */}
               <div className="flex border-b-2 border-amber-900/15 bg-[#faf6f0] sticky top-0 z-20">
                 <div className="w-40 min-w-40 max-w-40 p-2.5 font-bold text-xs text-amber-900/70 uppercase tracking-wider border-r border-amber-900/10 bg-[#faf6f0] sticky left-0 z-25">
                   Day &amp; Date
                 </div>
-                <div className="flex flex-grow">
+                <div className="flex flex-shrink-0" style={{ width: `${TOTAL_HOURS * DESKTOP_HOUR_W}px` }}>
                   {Array.from({ length: TOTAL_HOURS }).map((_, i) => (
                     <div
                       key={i}
