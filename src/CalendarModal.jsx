@@ -55,12 +55,30 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
   // Drag-to-create state (Desktop and Mobile track dragging)
   const [dragCreation, setDragCreation] = useState(null);
+  // Mobile Press-and-Hold to Drag-Create state
+  const mobileHoldTimerRef = React.useRef(null);
+  const mobileHoldStartPosRef = React.useRef(null);
+  const isMobileDraggingRef = React.useRef(false);
   // { day: 'Thu', start: 14, currentEnd: 15.5, isVertical: false }
 
   // Hovered / Pressed Event Popup state
   const [previewEvent, setPreviewEvent] = useState(null);
   const [previewPos, setPreviewPos] = useState({ x: 0, y: 0 });
   const [longPressTimer, setLongPressTimer] = useState(null);
+
+  // Body scroll lock when calendar is open
+  useEffect(() => {
+    if (isOpen) {
+      const origOverflow = document.body.style.overflow;
+      const origTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+      return () => {
+        document.body.style.overflow = origOverflow;
+        document.body.style.touchAction = origTouchAction;
+      };
+    }
+  }, [isOpen]);
 
   // Sync with Firestore collection `calendar_events`
   useEffect(() => {
@@ -208,35 +226,61 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
     window.addEventListener('pointerup', onPointerUp);
   };
 
-  // Click & Drag to create an event on mobile vertical track
-  const handleMobileTrackPointerDown = (dayId, trackEl, e) => {
+  // Press-and-Hold to Drag & Create on mobile vertical track
+  const handleMobileTrackTouchStart = (dayId, trackEl, e) => {
     setPreviewEvent(null);
     if (e.target.closest('[id^="m-card-"]')) return;
-    if (e.button !== 0) return;
+    if (e.touches.length !== 1) return;
+
+    const touch = e.touches[0];
+    const startX = touch.clientX;
+    const startY = touch.clientY;
+    mobileHoldStartPosRef.current = { x: startX, y: startY };
+    isMobileDraggingRef.current = false;
 
     const trackRect = trackEl.getBoundingClientRect();
-    const clickY = e.clientY - trackRect.top;
+    const clickY = startY - trackRect.top;
     const rawHour = START_HOUR + clickY / MOBILE_HOUR_H;
     const initialStart = Math.min(Math.max(Math.floor(rawHour * 2) / 2, START_HOUR), END_HOUR - 0.5);
 
-    let currentEnd = initialStart + 0.5;
-    let didDrag = false;
-
-    setDragCreation({
-      day: dayId,
-      start: initialStart,
-      end: currentEnd,
-      isVertical: true
-    });
-
-    const onPointerMove = (me) => {
-      const moveY = me.clientY - trackRect.top;
-      if (Math.abs(me.clientY - e.clientY) > 6) {
-        didDrag = true;
+    // Wait 400ms hold before triggering drag-creation mode
+    mobileHoldTimerRef.current = setTimeout(() => {
+      isMobileDraggingRef.current = true;
+      if (window.navigator?.vibrate) {
+        window.navigator.vibrate(40); // Subtle haptic feedback
       }
+
+      setDragCreation({
+        day: dayId,
+        start: initialStart,
+        end: initialStart + 0.5,
+        isVertical: true
+      });
+    }, 400);
+
+    const onTouchMove = (me) => {
+      const curTouch = me.touches[0];
+      const deltaX = Math.abs(curTouch.clientX - startX);
+      const deltaY = Math.abs(curTouch.clientY - startY);
+
+      if (!isMobileDraggingRef.current) {
+        // If user is just swiping/scrolling before the hold threshold, cancel the timer
+        if (deltaX > 8 || deltaY > 8) {
+          if (mobileHoldTimerRef.current) {
+            clearTimeout(mobileHoldTimerRef.current);
+            mobileHoldTimerRef.current = null;
+          }
+        }
+        return;
+      }
+
+      // Drag creation is active - prevent page scroll
+      if (me.cancelable) me.preventDefault();
+
+      const moveY = curTouch.clientY - trackRect.top;
       const moveHour = START_HOUR + moveY / MOBILE_HOUR_H;
       const snappedEnd = Math.round(moveHour * 4) / 4;
-      currentEnd = Math.min(Math.max(snappedEnd, initialStart + 0.5), END_HOUR);
+      const currentEnd = Math.min(Math.max(snappedEnd, initialStart + 0.5), END_HOUR);
 
       setDragCreation({
         day: dayId,
@@ -246,17 +290,34 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
       });
     };
 
-    const onPointerUp = () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      setDragCreation(null);
+    const onTouchEnd = (te) => {
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchEnd);
 
-      const duration = didDrag ? Math.max(Math.round((currentEnd - initialStart) * 4) / 4, 0.5) : 1;
-      handleOpenAddEvent(dayId, initialStart, duration);
+      if (mobileHoldTimerRef.current) {
+        clearTimeout(mobileHoldTimerRef.current);
+        mobileHoldTimerRef.current = null;
+      }
+
+      if (isMobileDraggingRef.current) {
+        isMobileDraggingRef.current = false;
+        const curTouch = te.changedTouches ? te.changedTouches[0] : null;
+        let finalDuration = 1;
+        if (curTouch) {
+          const endY = curTouch.clientY - trackRect.top;
+          const endHour = START_HOUR + endY / MOBILE_HOUR_H;
+          const snappedEnd = Math.round(endHour * 4) / 4;
+          finalDuration = Math.max(snappedEnd - initialStart, 0.5);
+        }
+        setDragCreation(null);
+        handleOpenAddEvent(dayId, initialStart, finalDuration);
+      }
     };
 
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd);
   };
 
   // Clear all itinerary events
@@ -512,8 +573,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
-      <div className="bg-[#faf7f2] border border-amber-900/20 rounded-2xl w-full max-w-[1450px] max-h-[95vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-[#f4ece1] z-50 flex flex-col overflow-hidden sm:bg-black/75 sm:backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4">
+      <div className="bg-[#faf7f2] w-full h-full sm:h-auto sm:max-w-[1450px] sm:max-h-[95vh] sm:rounded-2xl sm:border sm:border-amber-900/20 flex flex-col shadow-2xl overflow-hidden animate-in fade-in duration-150">
         
         {/* Header Bar */}
         <div className="bg-white/95 px-4 sm:px-6 py-3.5 border-b border-amber-900/10 flex items-center justify-between gap-3 flex-shrink-0">
@@ -626,8 +687,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
               {/* Vertical Events Track */}
               <div 
                 id={`m-track-${currentDay.id}`}
-                onPointerDown={(e) => handleMobileTrackPointerDown(currentDay.id, document.getElementById(`m-track-${currentDay.id}`), e)}
-                className="flex-1 relative cursor-crosshair"
+                onTouchStart={(e) => handleMobileTrackTouchStart(currentDay.id, document.getElementById(`m-track-${currentDay.id}`), e)}
+                className="flex-1 relative"
                 style={{
                   backgroundImage: `repeating-linear-gradient(to bottom, transparent, transparent ${MOBILE_HOUR_H - 1}px, #e8dfd5 ${MOBILE_HOUR_H - 1}px, #e8dfd5 ${MOBILE_HOUR_H}px)`
                 }}
