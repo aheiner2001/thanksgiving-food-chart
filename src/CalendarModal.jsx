@@ -27,43 +27,7 @@ export const DAYS = [
   { id: "Sun", name: "Sunday", date: "Nov 29", tag: "Departures" }
 ];
 
-export const INITIAL_DEFAULT_EVENTS = [
-  // Tuesday
-  { id: "e1", day: "Tue", start: 14, duration: 3, title: "House 1 Arrivals & Settle In", group: "house-1", location: "House 1" },
-  { id: "e2", day: "Tue", start: 16, duration: 2.5, title: "House 2 Arrivals & Unpack", group: "house-2", location: "House 2" },
-  { id: "e3", day: "Tue", start: 18.5, duration: 2, title: "Welcome Dinner & Pizza", group: "meal", location: "House 1" },
-
-  // Wednesday
-  { id: "e4", day: "Wed", start: 8.5, duration: 1.5, title: "Breakfast & Coffee", group: "meal", location: "Both Houses" },
-  { id: "e5", day: "Wed", start: 10.5, duration: 2, title: "Thanksgiving Pie & Sides Prep", group: "both-houses", location: "House 1 Kitchen" },
-  { id: "e6", day: "Wed", start: 12.5, duration: 1.5, title: "Lunch Sandwiches", group: "meal", location: "House 2" },
-  { id: "e7", day: "Wed", start: 14.5, duration: 2, title: "Afternoon Walk & Nap Time 😴", group: "both-houses", location: "Beds / Couches" },
-  { id: "e8", day: "Wed", start: 18, duration: 2, title: "Family Dinner & Games", group: "meal", location: "House 1" },
-
-  // Thursday (Thanksgiving)
-  { id: "e9", day: "Thu", start: 8, duration: 1.5, title: "Light Breakfast & Coffee", group: "meal", location: "Both Houses" },
-  { id: "e10", day: "Thu", start: 9.5, duration: 3, title: "Parade Watching & Turkey Prep", group: "both-houses", location: "House 1" },
-  { id: "e11", day: "Thu", start: 14, duration: 3, title: "🦃 Thanksgiving Feast (Early Dinner)", group: "meal", location: "House 1 Dining Area" },
-  { id: "e12", day: "Thu", start: 17.5, duration: 2, title: "Turkey Coma & Nap Time 😴", group: "both-houses", location: "Quiet Rooms" },
-  { id: "e13", day: "Thu", start: 20, duration: 2, title: "Pie Buffet & Card Games", group: "meal", location: "House 2 Living Room" },
-
-  // Friday
-  { id: "e14", day: "Fri", start: 8.5, duration: 1.5, title: "Breakfast & Leftovers", group: "meal", location: "Both Houses" },
-  { id: "e15", day: "Fri", start: 10.5, duration: 3, title: "Group Outing / Scenic Nature Walk", group: "both-houses", location: "Park Trail" },
-  { id: "e16", day: "Fri", start: 13.5, duration: 1.5, title: "Lunch / Food Run", group: "meal", location: "Downtown" },
-  { id: "e17", day: "Fri", start: 15.5, duration: 2, title: "Yard Games & Downtime", group: "house-2", location: "House 2 Lawn" },
-  { id: "e18", day: "Fri", start: 18, duration: 2.5, title: "Dinner & Movie Night", group: "meal", location: "House 1" },
-
-  // Saturday
-  { id: "e19", day: "Sat", start: 8.5, duration: 1.5, title: "Breakfast", group: "meal", location: "Both Houses" },
-  { id: "e20", day: "Sat", start: 11, duration: 3, title: "Downtown Stroll & Coffee", group: "both-houses", location: "Main Street" },
-  { id: "e21", day: "Sat", start: 14.5, duration: 2, title: "Nap & Recharge", group: "both-houses", location: "Each House" },
-  { id: "e22", day: "Sat", start: 17.5, duration: 3, title: "Final Night Celebration Dinner", group: "meal", location: "House 1" },
-
-  // Sunday
-  { id: "e23", day: "Sun", start: 8, duration: 2, title: "Farewell Breakfast & Packing", group: "meal", location: "House 1" },
-  { id: "e24", day: "Sun", start: 10.5, duration: 2.5, title: "Departures & Goodbyes", group: "both-houses", location: "Both Houses" }
-];
+export const INITIAL_DEFAULT_EVENTS = [];
 
 export function formatTime(decimalHour) {
   const hours = Math.floor(decimalHour);
@@ -86,8 +50,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
   const [formTitle, setFormTitle] = useState('');
   const [formStart, setFormStart] = useState(14);
   const [formDuration, setFormDuration] = useState(2);
-  const [formGroup, setFormGroup] = useState('both-houses');
   const [formLocation, setFormLocation] = useState('');
+  const [formAddress, setFormAddress] = useState('');
 
   // Drag-to-create state (Desktop and Mobile track dragging)
   const [dragCreation, setDragCreation] = useState(null);
@@ -112,8 +76,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
       setFormDay('Thu');
       setFormStart(15);
       setFormDuration(2);
-      setFormGroup('both-houses');
       setFormLocation(initialItemToAdd.broughtBy ? `Lead: ${initialItemToAdd.broughtBy}` : '');
+      setFormAddress('');
       setIsEventFormOpen(true);
       if (onClearInitialItem) onClearInitialItem();
     }
@@ -129,8 +93,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
     setFormDay(dayId);
     setFormStart(defaultStart);
     setFormDuration(defaultDuration);
-    setFormGroup('both-houses');
     setFormLocation('');
+    setFormAddress('');
     setIsEventFormOpen(true);
   };
 
@@ -141,8 +105,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
     setFormDay(evt.day);
     setFormStart(evt.start);
     setFormDuration(evt.duration);
-    setFormGroup(evt.group || 'both-houses');
     setFormLocation(evt.location || '');
+    setFormAddress(evt.address || '');
     setIsEventFormOpen(true);
   };
 
@@ -165,8 +129,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
         day: formDay,
         start: Number(formStart),
         duration: Number(formDuration),
-        group: formGroup,
         location: formLocation.trim(),
+        address: formAddress.trim(),
         updatedAt: serverTimestamp()
       };
 
@@ -498,13 +462,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
     window.addEventListener('pointerup', onPointerUp);
   };
 
-  const getGroupColorClass = (group) => {
-    switch(group) {
-      case 'house-1': return 'border-l-4 border-l-blue-600 bg-blue-50/90 text-blue-950';
-      case 'house-2': return 'border-l-4 border-l-emerald-600 bg-emerald-50/90 text-emerald-950';
-      case 'meal': return 'border-l-4 border-l-amber-700 bg-amber-50/90 text-amber-950';
-      default: return 'border-l-4 border-l-amber-500 bg-orange-50/80 text-gray-900';
-    }
+  const getCardColorClass = () => {
+    return 'border-l-4 border-l-amber-600 bg-amber-50/90 text-amber-950';
   };
 
   return (
@@ -652,7 +611,7 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                         id={`m-card-${evt.id}`}
                         onPointerDown={(e) => startDragVertical(evt, document.getElementById(`m-card-${evt.id}`), e)}
                         style={{ top: `${top}px`, height: `${height}px` }}
-                        className={`absolute left-2 right-2 rounded-xl shadow-xs border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing select-none group touch-none ${getGroupColorClass(evt.group)}`}
+                        className={`absolute left-2 right-2 rounded-xl shadow-xs border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing select-none group touch-none ${getCardColorClass()}`}
                       >
                         {/* Top Resize Handle */}
                         <div
@@ -687,7 +646,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
                         <div className="pointer-events-none">
                           <div className="font-bold text-xs leading-snug line-clamp-1">{evt.title}</div>
-                          {evt.location && <div className="text-[11px] opacity-75 line-clamp-1">📍 {evt.location}</div>}
+                          {evt.location && <div className="text-[11px] opacity-80 line-clamp-1">📍 {evt.location}</div>}
+                          {evt.address && <div className="text-[10px] opacity-70 line-clamp-1">🏠 {evt.address}</div>}
                         </div>
 
                         {/* Bottom Resize Handle */}
@@ -778,7 +738,7 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                             id={`d-card-${evt.id}`}
                             onPointerDown={(e) => startDragHorizontal(evt, document.getElementById(`d-card-${evt.id}`), e)}
                             style={{ left: `${left}px`, width: `${width}px` }}
-                            className={`absolute top-2.5 h-[76px] rounded-xl shadow-xs border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing select-none group touch-none ${getGroupColorClass(evt.group)}`}
+                            className={`absolute top-2.5 h-[76px] rounded-xl shadow-xs border p-2 flex flex-col justify-between cursor-grab active:cursor-grabbing select-none group touch-none ${getCardColorClass()}`}
                           >
                             {/* Left Handle */}
                             <div
@@ -815,11 +775,19 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                               <div className="font-bold text-xs text-gray-900 truncate" title={evt.title}>
                                 {evt.title}
                               </div>
-                              {evt.location && (
-                                <div className="text-[10px] text-gray-500 truncate" title={evt.location}>
-                                  📍 {evt.location}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-1.5 text-[10px] text-gray-600 truncate">
+                                {evt.location && (
+                                  <span className="truncate" title={evt.location}>
+                                    📍 {evt.location}
+                                  </span>
+                                )}
+                                {evt.location && evt.address && <span>•</span>}
+                                {evt.address && (
+                                  <span className="truncate opacity-75" title={evt.address}>
+                                    🏠 {evt.address}
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             {/* Right Handle */}
@@ -910,26 +878,23 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Type / House</label>
-                  <select
-                    value={formGroup}
-                    onChange={(e) => setFormGroup(e.target.value)}
-                    className="w-full px-2 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium"
-                  >
-                    <option value="both-houses">Both Houses</option>
-                    <option value="meal">Meal / Feast</option>
-                    <option value="house-1">House 1</option>
-                    <option value="house-2">House 2</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Location / Notes</label>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Location / Venue</label>
                   <input
                     type="text"
-                    placeholder="e.g. House 1 Patio"
+                    placeholder="e.g. Grandma's House, Park Trail"
                     value={formLocation}
                     onChange={(e) => setFormLocation(e.target.value)}
-                    className="w-full px-2 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium"
+                    className="w-full px-2 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Address / Details</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 123 Maple St or Patio"
+                    value={formAddress}
+                    onChange={(e) => setFormAddress(e.target.value)}
+                    className="w-full px-2 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>
               </div>
