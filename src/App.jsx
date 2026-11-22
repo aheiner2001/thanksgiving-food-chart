@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { getOwnerId, getSavedName, saveGuestName, findSimilarItems } from './utils';
+import CalendarModal from './CalendarModal';
 
 const DEFAULT_CATEGORIES = [
   { name: 'Main Dish', icon: '🍗' },
@@ -29,6 +30,10 @@ export default function App() {
   // Ownership & Admin
   const [myOwnerId] = useState(() => getOwnerId());
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Calendar Itinerary Modal
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarInitialItem, setCalendarInitialItem] = useState(null);
 
   // Add / Edit Item Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -506,6 +511,14 @@ export default function App() {
             </span>
           )}
           <button
+            onClick={() => setIsCalendarOpen(true)}
+            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white shadow-xs text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+            title="Open Thanksgiving Week Calendar Itinerary"
+          >
+            <span>📅</span>
+            <span>Week Calendar</span>
+          </button>
+          <button
             onClick={() => setIsSuggestModalOpen(true)}
             className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white shadow-xs text-xs font-bold rounded-xl transition flex items-center gap-1.5"
           >
@@ -803,6 +816,21 @@ export default function App() {
                                       )}
                                     </span>
                                   </div>
+
+                                  {/* Add to Calendar button for activities */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCalendarInitialItem(item);
+                                      setIsCalendarOpen(true);
+                                    }}
+                                    className="w-full py-1 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
+                                    title="Schedule this activity on the week calendar"
+                                  >
+                                    <span>📅</span>
+                                    <span>Add to Calendar</span>
+                                  </button>
 
                                   {/* 1-5 Interactive Rating Selector */}
                                   <div className="flex items-center justify-between bg-amber-50/60 p-1 rounded-lg border border-amber-200/60">
@@ -1213,6 +1241,17 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Calendar Modal */}
+      <CalendarModal
+        isOpen={isCalendarOpen}
+        onClose={() => {
+          setIsCalendarOpen(false);
+          setCalendarInitialItem(null);
+        }}
+        initialItemToAdd={calendarInitialItem}
+        onClearInitialItem={() => setCalendarInitialItem(null)}
+      />
     </div>
   );
 }
