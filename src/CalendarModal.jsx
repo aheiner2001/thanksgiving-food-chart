@@ -14,7 +14,7 @@ import { db } from './firebase';
 const START_HOUR = 7;   // 7:00 AM
 const END_HOUR = 23;    // 11:00 PM
 const TOTAL_HOURS = END_HOUR - START_HOUR;
-const DESKTOP_HOUR_W = 80;
+const DESKTOP_HOUR_W = 105;
 const MOBILE_HOUR_H = 68;
 const MIN_DURATION = 0.5;
 
@@ -730,7 +730,8 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                       )}
                       {dayEvents.map(evt => {
                         const left = (evt.start - START_HOUR) * DESKTOP_HOUR_W;
-                        const width = Math.max(evt.duration * DESKTOP_HOUR_W, 40);
+                        const width = Math.max(evt.duration * DESKTOP_HOUR_W, 64);
+                        const isShort = evt.duration <= 1;
 
                         return (
                           <div
@@ -749,11 +750,11 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                             </div>
 
                             {/* Card Body */}
-                            <div className="flex items-start justify-between gap-1 pointer-events-none px-1">
-                              <span className="text-[11px] font-bold text-amber-900 whitespace-nowrap">
-                                {formatTime(evt.start)} - {formatTime(evt.start + evt.duration)}
+                            <div className="flex items-start justify-between gap-1 pointer-events-none">
+                              <span className="text-[11px] font-bold text-amber-900 truncate">
+                                {isShort ? formatTime(evt.start) : `${formatTime(evt.start)} - ${formatTime(evt.start + evt.duration)}`}
                               </span>
-                              <div className="flex items-center gap-1 pointer-events-auto">
+                              <div className="flex items-center gap-1 pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                   onClick={(e) => handleOpenEditEvent(evt, e)}
                                   className="text-gray-400 hover:text-gray-900 text-xs p-0.5"
@@ -771,7 +772,7 @@ export default function CalendarModal({ isOpen, onClose, initialItemToAdd, onCle
                               </div>
                             </div>
 
-                            <div className="px-1 pointer-events-none">
+                            <div className="pointer-events-none">
                               <div className="font-bold text-xs text-gray-900 truncate" title={evt.title}>
                                 {evt.title}
                               </div>
